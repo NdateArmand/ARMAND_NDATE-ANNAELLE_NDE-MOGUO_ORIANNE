@@ -27,9 +27,10 @@ public class JdbcExhibitionDao implements ExhibitionDao {
             "INSERT INTO EXPOSITION (titre, theme, date_debut, date_fin, description) " +
             "VALUES (?, ?, ?, ?, ?)";
 
+    // UPDATE avec possibilité de changer le titre
     private static final String UPDATE =
             "UPDATE EXPOSITION " +
-            "SET theme=?, date_debut=?, date_fin=?, description=? " +
+            "SET titre=?, theme=?, date_debut=?, date_fin=?, description=? " +
             "WHERE titre=?";
 
     private static final String DELETE =
@@ -70,18 +71,23 @@ public class JdbcExhibitionDao implements ExhibitionDao {
 
     @Override
     public void update(Exhibition exhibition) {
+        update(exhibition, exhibition.getTitle());
+    }
+
+    /** Update avec ancien titre comme critère WHERE */
+    public void update(Exhibition exhibition, String oldTitle) {
         try (Connection conn = ConnectionManager.getConnection();
              PreparedStatement ps = conn.prepareStatement(UPDATE)) {
             conn.setAutoCommit(false);
             try {
-                ps.setString(1, exhibition.getTheme());
-                ps.setDate  (2, Date.valueOf(exhibition.getStartDate()));
-                ps.setDate  (3, Date.valueOf(exhibition.getEndDate()));
-                ps.setString(4, exhibition.getDescription());
-                ps.setString(5, exhibition.getTitle());
+                ps.setString(1, exhibition.getTitle());  // nouveau titre
+                ps.setString(2, exhibition.getTheme());
+                ps.setDate  (3, Date.valueOf(exhibition.getStartDate()));
+                ps.setDate  (4, Date.valueOf(exhibition.getEndDate()));
+                ps.setString(5, exhibition.getDescription());
+                ps.setString(6, oldTitle);               // WHERE titre=ancien_titre
                 int rows = ps.executeUpdate();
-                if (rows == 0) throw new RuntimeException("Exposition introuvable : " + exhibition.getTitle());
-                // Trigger trg_audit_exposition se déclenche automatiquement ici
+                if (rows == 0) throw new RuntimeException("Exposition introuvable : " + oldTitle);
                 conn.commit();
             } catch (SQLException e) { conn.rollback(); throw e; }
         } catch (SQLException e) {

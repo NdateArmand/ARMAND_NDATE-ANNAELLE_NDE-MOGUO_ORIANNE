@@ -3,6 +3,7 @@ package com.project.artconnect.ui;
 import com.project.artconnect.model.Artist;
 import com.project.artconnect.model.Session;
 import com.project.artconnect.model.Workshop;
+import com.project.artconnect.persistence.JdbcWorkshopDao;
 import com.project.artconnect.service.ArtistService;
 import com.project.artconnect.service.WorkshopService;
 import com.project.artconnect.util.ConnectionManager;
@@ -33,23 +34,17 @@ public class WorkshopController implements RoleAware {
     @FXML private TableColumn<Workshop, Double> priceColumn;
     @FXML private TableColumn<Workshop, String> levelColumn;
     @FXML private TableColumn<Workshop, Number> durationColumn;
-    @FXML private TableColumn<Workshop, Number> inscritsColumn;  // ORGANISATEUR
-    @FXML private TableColumn<Workshop, String> statutMembreColumn; // MEMBRE
+    @FXML private TableColumn<Workshop, Number> inscritsColumn;
+    @FXML private TableColumn<Workshop, String> statutMembreColumn;
 
-    // ARTISTE : label inscrits
-    @FXML private Label artistInscritsLabel;
+    @FXML private Label               artistInscritsLabel;
+    @FXML private VBox                inscritsPanel;
+    @FXML private Label               inscritsPanelTitle;
+    @FXML private ListView<String>    inscritsListView;
+    @FXML private HBox                inscriptionBox;
+    @FXML private Button              btnDesinscrire;
+    @FXML private Label               inscriptionLabel;
 
-    // ORGANISATEUR : panneau liste inscrits
-    @FXML private VBox     inscritsPanel;
-    @FXML private Label    inscritsPanelTitle;
-    @FXML private ListView<String> inscritsListView;
-
-    // MEMBRE : inscription/désinscription
-    @FXML private HBox  inscriptionBox;
-    @FXML private Button btnDesinscrire;
-    @FXML private Label inscriptionLabel;
-
-    // CRUD
     @FXML private GridPane         crudForm;
     @FXML private Label            crudTitle;
     @FXML private HBox             crudBox;
@@ -63,9 +58,15 @@ public class WorkshopController implements RoleAware {
     @FXML private TextField        formLocation;
     @FXML private Label            statusLabel;
 
-    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    // Accepte les deux formats
+    private static final DateTimeFormatter FMT_FULL  = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter FMT_DATE  = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+    private String originalTitle = null;
+
     private final WorkshopService workshopService = ServiceProvider.getWorkshopService();
     private final ArtistService   artistService   = ServiceProvider.getArtistService();
+    private final JdbcWorkshopDao workshopDao     = new JdbcWorkshopDao();
 
     @FXML
     public void initialize() {
@@ -74,11 +75,10 @@ public class WorkshopController implements RoleAware {
         levelColumn    .setCellValueFactory(new PropertyValueFactory<>("level"));
         durationColumn .setCellValueFactory(new PropertyValueFactory<>("durationMinutes"));
         dateColumn     .setCellValueFactory(cd -> new SimpleStringProperty(
-                cd.getValue().getDate() != null ? cd.getValue().getDate().format(FMT) : "—"));
+                cd.getValue().getDate() != null ? cd.getValue().getDate().format(FMT_FULL) : "—"));
         instructorColumn.setCellValueFactory(cd -> new SimpleStringProperty(
                 cd.getValue().getInstructor() != null ? cd.getValue().getInstructor().getName() : "—"));
 
-        // Colonne inscrits — calculée depuis la BDD
         if (inscritsColumn != null)
             inscritsColumn.setCellValueFactory(cd ->
                     new SimpleIntegerProperty(getNbInscrits(cd.getValue().getTitle())));
@@ -86,13 +86,14 @@ public class WorkshopController implements RoleAware {
             statutMembreColumn.setCellValueFactory(cd -> {
                 Session s = Session.getInstance();
                 if (s.isMembre() && s.getIdMembre() != null)
-                    return new SimpleStringProperty(estInscrit(cd.getValue().getTitle(), s.getIdMembre()) ? "✅ Inscrit" : "⬜ Non inscrit");
+                    return new SimpleStringProperty(
+                            estInscrit(cd.getValue().getTitle(), s.getIdMembre()) ? "✅ Inscrit" : "⬜ Non inscrit");
                 return new SimpleStringProperty("");
             });
 
         if (formLevel != null)
             formLevel.setItems(FXCollections.observableArrayList(
-                    "débutant","intermédiaire","avancé","tous niveaux"));
+                    "débutant", "intermédiaire", "avancé", "tous niveaux"));
         if (formInstructor != null)
             formInstructor.setItems(FXCollections.observableArrayList(
                     artistService.getAllArtists().stream().map(Artist::getName).toList()));
@@ -105,34 +106,34 @@ public class WorkshopController implements RoleAware {
         Session session = Session.getInstance();
         clearForm();
 
-        // Masquer tout par défaut
-        setVisible(artistInscritsLabel,  false);
-        setVisible(inscritsPanel,        false);
-        setVisible(inscritsColumn,       false);
-        setVisible(statutMembreColumn,   false);
-        setVisible(inscriptionBox,       false);
+        setVisible(artistInscritsLabel, false);
+        setVisible(inscritsPanel,       false);
+        setVisible(inscritsColumn,      false);
+        setVisible(statutMembreColumn,  false);
+        setVisible(inscriptionBox,      false);
         setVisible(crudForm,            false);
         setVisible(crudBox,             false);
         setVisible(crudTitle,           false);
 
         if (session.isPublic()) {
-            // Lecture seule, rien
+            // Lecture seule
 
         } else if (session.isMembre()) {
-            // Tableau complet + colonne statut + boutons selon sélection
             setVisible(statutMembreColumn, true);
-            setVisible(inscriptionBox, true);
+            setVisible(inscriptionBox,     true);
             workshopTable.getSelectionModel().selectedItemProperty()
                     .addListener((obs, old, sel) -> updateMembreButtons(sel));
 
         } else if (session.isArtiste()) {
-            // CRUD ses ateliers + label inscrits au clic
             setVisible(crudForm,            true);
             setVisible(crudBox,             true);
             setVisible(crudTitle,           true);
             setVisible(artistInscritsLabel, true);
             if (crudTitle     != null) crudTitle.setText("My Workshops");
-            if (formInstructor != null) { formInstructor.setValue(session.getDisplayName()); formInstructor.setDisable(true); }
+            if (formInstructor != null) {
+                formInstructor.setValue(session.getDisplayName());
+                formInstructor.setDisable(true);
+            }
             workshopTable.getSelectionModel().selectedItemProperty()
                     .addListener((obs, old, sel) -> {
                         if (sel != null) {
@@ -145,45 +146,31 @@ public class WorkshopController implements RoleAware {
                     });
 
         } else {
-            // ORGANISATEUR : CRUD + colonne inscrits + panneau liste
+            // ORGANISATEUR
             setVisible(crudForm,       true);
             setVisible(crudBox,        true);
             setVisible(crudTitle,      true);
             setVisible(inscritsColumn, true);
             setVisible(inscritsPanel,  true);
-            if (crudTitle     != null) crudTitle.setText("Add / Edit Workshop");
+            if (crudTitle      != null) crudTitle.setText("Add / Edit Workshop");
             if (formInstructor != null) formInstructor.setDisable(false);
             workshopTable.getSelectionModel().selectedItemProperty()
                     .addListener((obs, old, sel) -> {
-                        if (sel != null) {
-                            fillForm(sel);
-                            loadInscritsPanel(sel.getTitle(), true);
-                        }
+                        if (sel != null) { fillForm(sel); loadInscritsPanel(sel.getTitle()); }
                     });
         }
 
         refreshTable();
     }
 
-    // ── Mise à jour boutons MEMBRE selon atelier sélectionné ──────────────────
+    // ── MEMBRE ───────────────────────────────────────────────────────────────
     private void updateMembreButtons(Workshop sel) {
         if (sel == null || !Session.getInstance().isMembre()) return;
         Integer idMembre = Session.getInstance().getIdMembre();
         if (idMembre == null) return;
-        boolean dejaInscrit = estInscrit(sel.getTitle(), idMembre);
-        if (btnDesinscrire != null) setVisible(btnDesinscrire, dejaInscrit);
+        if (btnDesinscrire != null) setVisible(btnDesinscrire, estInscrit(sel.getTitle(), idMembre));
     }
 
-    // ── Chargement du panneau inscrits (ORGANISATEUR) ─────────────────────────
-    private void loadInscritsPanel(String titre, boolean isAtelier) {
-        if (inscritsListView == null) return;
-        List<String> membres = getMembresInscritsAtelier(titre);
-        inscritsListView.setItems(FXCollections.observableArrayList(membres));
-        if (inscritsPanelTitle != null)
-            inscritsPanelTitle.setText("Membres inscrits (" + membres.size() + ") — " + titre);
-    }
-
-    // ── Action MEMBRE : S'inscrire ─────────────────────────────────────────────
     @FXML private void handleInscrire() {
         Workshop sel = workshopTable.getSelectionModel().getSelectedItem();
         if (sel == null) { setInscription("Sélectionnez un atelier.", true); return; }
@@ -199,7 +186,8 @@ public class WorkshopController implements RoleAware {
             if (idAtelier < 0) { setInscription("Atelier introuvable.", true); return; }
             conn.setAutoCommit(false);
             try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO inscription (id_membre,id_atelier,date_inscription,nb_places,statut_paie) VALUES(?,?,CURDATE(),1,'en attente')")) {
+                    "INSERT INTO inscription (id_membre,id_atelier,date_inscription,nb_places,statut_paie) " +
+                    "VALUES(?,?,CURDATE(),1,'en attente')")) {
                 ps.setInt(1, session.getIdMembre()); ps.setInt(2, idAtelier);
                 ps.executeUpdate(); conn.commit();
                 setInscription("Inscription confirmée !", false);
@@ -209,7 +197,6 @@ public class WorkshopController implements RoleAware {
         } catch (SQLException e) { setInscription("Erreur : " + e.getMessage(), true); }
     }
 
-    // ── Action MEMBRE : Se désinscrire ─────────────────────────────────────────
     @FXML private void handleDesinscrire() {
         Workshop sel = workshopTable.getSelectionModel().getSelectedItem();
         if (sel == null) { setInscription("Sélectionnez un atelier.", true); return; }
@@ -229,38 +216,67 @@ public class WorkshopController implements RoleAware {
         } catch (SQLException e) { setInscription("Erreur : " + e.getMessage(), true); }
     }
 
-    // ── CRUD ──────────────────────────────────────────────────────────────────
+    // ── CRUD ─────────────────────────────────────────────────────────────────
     @FXML private void handleCreate() {
-        try { saveWorkshop(buildFromForm()); setStatus("Workshop added.", false); clearForm(); refreshTable();
+        originalTitle = null; // garantir un INSERT
+        try {
+            workshopDao.save(buildFromForm());
+            setStatus("Workshop added.", false); clearForm(); refreshTable();
         } catch (Exception e) { setStatus("Error: " + e.getMessage(), true); }
     }
+
     @FXML private void handleUpdate() {
         Workshop sel = workshopTable.getSelectionModel().getSelectedItem();
         if (sel == null) { setStatus("Select a workshop.", true); return; }
         Session session = Session.getInstance();
         if (session.isArtiste()) {
             String instr = sel.getInstructor() != null ? sel.getInstructor().getName() : "";
-            if (!instr.equals(session.getDisplayName())) { setStatus("Vos ateliers uniquement.", true); return; }
+            if (!instr.equals(session.getDisplayName())) {
+                setStatus("Vos ateliers uniquement.", true); return;
+            }
         }
-        try { updateWorkshop(buildFromForm()); setStatus("Updated.", false); refreshTable();
+        try {
+            Workshop w = buildFromForm(); // contient le nouveau titre saisi
+            // Passer l'ancien titre au DAO pour le WHERE
+            String oldTitle = originalTitle != null ? originalTitle : w.getTitle();
+            workshopDao.update(w, oldTitle);
+            setStatus("Updated.", false); refreshTable();
         } catch (Exception e) { setStatus("Error: " + e.getMessage(), true); }
     }
+
     @FXML private void handleDelete() {
         Workshop sel = workshopTable.getSelectionModel().getSelectedItem();
         if (sel == null) { setStatus("Select a workshop.", true); return; }
+        Session session = Session.getInstance();
+        if (session.isArtiste()) {
+            String instr = sel.getInstructor() != null ? sel.getInstructor().getName() : "";
+            if (!instr.equals(session.getDisplayName())) {
+                setStatus("Vos ateliers uniquement.", true); return;
+            }
+        }
         new Alert(Alert.AlertType.CONFIRMATION, "Delete \"" + sel.getTitle() + "\"?",
                 ButtonType.YES, ButtonType.NO).showAndWait().ifPresent(bt -> {
             if (bt == ButtonType.YES) {
-                try { deleteWorkshop(sel.getTitle()); setStatus("Deleted.", false); clearForm(); refreshTable();
+                try { workshopDao.delete(sel.getTitle());
+                    setStatus("Deleted.", false); clearForm(); refreshTable();
                 } catch (Exception e) { setStatus("Error: " + e.getMessage(), true); }
             }
         });
     }
+
     @FXML private void handleResetForm() {
         clearForm();
         Session s = Session.getInstance();
         if (s.isArtiste() && formInstructor != null) formInstructor.setValue(s.getDisplayName());
-        if (artistInscritsLabel != null) artistInscritsLabel.setText("");
+    }
+
+    // ── Panneau inscrits ORGANISATEUR ─────────────────────────────────────────
+    private void loadInscritsPanel(String titre) {
+        if (inscritsListView == null) return;
+        List<String> membres = getMembresInscritsAtelier(titre);
+        inscritsListView.setItems(FXCollections.observableArrayList(membres));
+        if (inscritsPanelTitle != null)
+            inscritsPanelTitle.setText("Membres inscrits (" + membres.size() + ") — " + titre);
     }
 
     // ── SQL helpers ───────────────────────────────────────────────────────────
@@ -278,8 +294,7 @@ public class WorkshopController implements RoleAware {
 
     private List<String> getMembresInscritsAtelier(String titre) {
         List<String> list = new ArrayList<>();
-        String sql = "SELECT m.nom, i.date_inscription, i.statut_paie " +
-                     "FROM inscription i " +
+        String sql = "SELECT m.nom, i.date_inscription FROM inscription i " +
                      "JOIN membre_communaute m ON m.id_membre=i.id_membre " +
                      "JOIN atelier a ON a.id_atelier=i.id_atelier " +
                      "WHERE a.titre=? AND i.statut_paie!='annulé' ORDER BY m.nom";
@@ -318,103 +333,82 @@ public class WorkshopController implements RoleAware {
         if (session.isArtiste())
             all = all.stream().filter(w -> w.getInstructor() != null
                     && w.getInstructor().getName().equals(session.getDisplayName())).toList();
-        // MEMBRE : voir tous les ateliers (colonne statut indique si inscrit)
         workshopTable.setItems(FXCollections.observableArrayList(all));
     }
 
-    private void saveWorkshop(Workshop w) throws SQLException {
-        String sql = "INSERT INTO ATELIER (titre,date_atelier,duree,participants_max,prix,description,niveau,lieu) VALUES(?,?,?,?,?,NULL,?,?)";
-        try (Connection conn = ConnectionManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            conn.setAutoCommit(false);
-            ps.setString(1,w.getTitle()); ps.setTimestamp(2,w.getDate()!=null?Timestamp.valueOf(w.getDate()):null);
-            ps.setInt(3,w.getDurationMinutes()); ps.setInt(4,w.getMaxParticipants());
-            ps.setDouble(5,w.getPrice()); ps.setString(6,w.getLevel()); ps.setString(7,w.getLocation());
-            ps.executeUpdate();
-            if (w.getInstructor() != null) {
-                try (ResultSet keys = ps.getGeneratedKeys()) {
-                    if (keys.next()) {
-                        try (PreparedStatement pl = conn.prepareStatement("UPDATE ARTISTE SET id_atelier=? WHERE nom=?")) {
-                            pl.setInt(1,keys.getInt(1)); pl.setString(2,w.getInstructor().getName()); pl.executeUpdate();
-                        }
-                    }
-                }
-            }
-            conn.commit();
-        }
-    }
-    private void updateWorkshop(Workshop w) throws SQLException {
-        try (Connection conn = ConnectionManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                "UPDATE ATELIER SET date_atelier=?,duree=?,participants_max=?,prix=?,niveau=?,lieu=? WHERE titre=?")) {
-            conn.setAutoCommit(false);
-            ps.setTimestamp(1,w.getDate()!=null?Timestamp.valueOf(w.getDate()):null);
-            ps.setInt(2,w.getDurationMinutes()); ps.setInt(3,w.getMaxParticipants());
-            ps.setDouble(4,w.getPrice()); ps.setString(5,w.getLevel());
-            ps.setString(6,w.getLocation()); ps.setString(7,w.getTitle());
-            ps.executeUpdate(); conn.commit();
-        }
-    }
-    private void deleteWorkshop(String title) throws SQLException {
-        try (Connection conn = ConnectionManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement("DELETE FROM ATELIER WHERE titre=?")) {
-            conn.setAutoCommit(false); ps.setString(1,title); ps.executeUpdate(); conn.commit();
-        }
-    }
     private Workshop buildFromForm() {
-        if (formTitle==null||formTitle.getText().isBlank()) throw new IllegalArgumentException("Title required.");
+        if (formTitle == null || formTitle.getText().isBlank())
+            throw new IllegalArgumentException("Title is required.");
         Workshop w = new Workshop();
-        w.setTitle(formTitle.getText().trim());
-        w.setLocation(formLocation!=null?formLocation.getText().trim():"");
-        w.setLevel(formLevel!=null?formLevel.getValue():null);
-        if (formPrice!=null&&!formPrice.getText().isBlank()) w.setPrice(Double.parseDouble(formPrice.getText().trim()));
-        if (formMaxPart!=null&&!formMaxPart.getText().isBlank()) w.setMaxParticipants(Integer.parseInt(formMaxPart.getText().trim()));
-        if (formDuration!=null&&!formDuration.getText().isBlank()) w.setDurationMinutes(Integer.parseInt(formDuration.getText().trim()));
-        if (formDate!=null&&!formDate.getText().isBlank()) {
-            try { w.setDate(LocalDateTime.parse(formDate.getText().trim(),FMT)); }
-            catch (DateTimeParseException ex) { throw new IllegalArgumentException("Format: YYYY-MM-DD HH:MM"); }
+        w.setTitle   (formTitle.getText().trim());
+        w.setLocation(formLocation != null ? formLocation.getText().trim() : "");
+        w.setLevel   (formLevel    != null ? formLevel.getValue()          : null);
+
+        if (formPrice    != null && !formPrice   .getText().isBlank())
+            w.setPrice(Double.parseDouble(formPrice.getText().trim()));
+        if (formMaxPart  != null && !formMaxPart .getText().isBlank())
+            w.setMaxParticipants(Integer.parseInt(formMaxPart.getText().trim()));
+        if (formDuration != null && !formDuration.getText().isBlank())
+            w.setDurationMinutes(Integer.parseInt(formDuration.getText().trim()));
+
+        // Date : accepte "YYYY-MM-DD HH:MM" ou "YYYY-MM-DD" (ajoute 00:00 si pas d'heure)
+        if (formDate != null && !formDate.getText().isBlank()) {
+            String dateStr = formDate.getText().trim();
+            try {
+                if (dateStr.length() == 10) dateStr += " 00:00"; // ajouter heure si manquante
+                w.setDate(LocalDateTime.parse(dateStr, FMT_FULL));
+            } catch (DateTimeParseException ex) {
+                throw new IllegalArgumentException("Format date : YYYY-MM-DD ou YYYY-MM-DD HH:MM");
+            }
         }
-        if (formInstructor!=null&&formInstructor.getValue()!=null)
+
+        if (formInstructor != null && formInstructor.getValue() != null)
             w.setInstructor(artistService.getArtistByName(formInstructor.getValue()).orElse(null));
         return w;
     }
+
     private void fillForm(Workshop w) {
-        if (formTitle    !=null) formTitle   .setText(w.getTitle()    !=null?w.getTitle()    :"");
-        if (formLocation !=null) formLocation.setText(w.getLocation()!=null?w.getLocation():"");
-        if (formPrice    !=null) formPrice   .setText(String.valueOf(w.getPrice()));
-        if (formMaxPart  !=null) formMaxPart .setText(String.valueOf(w.getMaxParticipants()));
-        if (formDuration !=null) formDuration.setText(String.valueOf(w.getDurationMinutes()));
-        if (formDate!=null&&w.getDate()!=null) formDate.setText(w.getDate().format(FMT));
-        if (formLevel!=null&&w.getLevel()!=null) formLevel.setValue(w.getLevel());
-        if (formInstructor!=null&&w.getInstructor()!=null&&!Session.getInstance().isArtiste())
-            formInstructor.setValue(w.getInstructor().getName());
+        originalTitle = w.getTitle();
+        if (formTitle    != null) formTitle   .setText(w.getTitle()    != null ? w.getTitle()    : "");
+        if (formLocation != null) formLocation.setText(w.getLocation() != null ? w.getLocation() : "");
+        if (formPrice    != null) formPrice   .setText(String.valueOf(w.getPrice()));
+        if (formMaxPart  != null) formMaxPart .setText(String.valueOf(w.getMaxParticipants()));
+        if (formDuration != null) formDuration.setText(String.valueOf(w.getDurationMinutes()));
+        if (formDate != null && w.getDate() != null) formDate.setText(w.getDate().format(FMT_FULL));
+        if (formLevel != null && w.getLevel() != null) formLevel.setValue(w.getLevel());
+        if (formInstructor != null && !Session.getInstance().isArtiste()) {
+            formInstructor.setValue(w.getInstructor() != null ? w.getInstructor().getName() : null);
+        }
     }
+
     private void clearForm() {
-        if (formTitle   !=null) formTitle.clear();
-        if (formLocation!=null) formLocation.clear();
-        if (formPrice   !=null) formPrice.clear();
-        if (formMaxPart !=null) formMaxPart.clear();
-        if (formDuration!=null) formDuration.clear();
-        if (formDate    !=null) formDate.clear();
-        if (formLevel   !=null) formLevel.setValue(null);
-        if (formInstructor!=null&&!Session.getInstance().isArtiste()) formInstructor.setValue(null);
-        if (statusLabel !=null) statusLabel.setText("");
-        if (artistInscritsLabel!=null) artistInscritsLabel.setText("");
-        if (inscritsListView!=null) inscritsListView.getItems().clear();
-        if (inscritsPanelTitle!=null) inscritsPanelTitle.setText("");
+        originalTitle = null;
+        if (formTitle    != null) formTitle.clear();
+        if (formLocation != null) formLocation.clear();
+        if (formPrice    != null) formPrice.clear();
+        if (formMaxPart  != null) formMaxPart.clear();
+        if (formDuration != null) formDuration.clear();
+        if (formDate     != null) formDate.clear();
+        if (formLevel    != null) formLevel.setValue(null);
+        if (formInstructor != null && !Session.getInstance().isArtiste()) formInstructor.setValue(null);
+        if (statusLabel  != null) statusLabel.setText("");
+        if (artistInscritsLabel  != null) artistInscritsLabel.setText("");
+        if (inscritsListView     != null) inscritsListView.getItems().clear();
+        if (inscritsPanelTitle   != null) inscritsPanelTitle.setText("");
     }
+
     private void setVisible(javafx.scene.Node node, boolean v) {
-        if (node!=null) { node.setVisible(v); node.setManaged(v); }
+        if (node != null) { node.setVisible(v); node.setManaged(v); }
     }
     private void setVisible(TableColumn<?,?> col, boolean v) {
-        if (col!=null) col.setVisible(v);
+        if (col != null) col.setVisible(v);
     }
     private void setStatus(String msg, boolean err) {
-        if (statusLabel!=null) { statusLabel.setText(msg);
-            statusLabel.setStyle(err?"-fx-text-fill:red;":"-fx-text-fill:green;"); }
+        if (statusLabel != null) { statusLabel.setText(msg);
+            statusLabel.setStyle(err ? "-fx-text-fill:red;" : "-fx-text-fill:green;"); }
     }
     private void setInscription(String msg, boolean err) {
-        if (inscriptionLabel!=null) { inscriptionLabel.setText(msg);
-            inscriptionLabel.setStyle(err?"-fx-text-fill:red;":"-fx-text-fill:green;"); }
+        if (inscriptionLabel != null) { inscriptionLabel.setText(msg);
+            inscriptionLabel.setStyle(err ? "-fx-text-fill:red;" : "-fx-text-fill:green;"); }
     }
 }

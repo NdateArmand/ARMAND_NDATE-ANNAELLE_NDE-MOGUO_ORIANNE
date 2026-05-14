@@ -30,9 +30,11 @@ public class JdbcArtistDao implements ArtistDao {
             "INSERT INTO ARTISTE (nom, bio, annee_naissance, email_contact, telephone, ville, website, social_media) " +
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
+    // UPDATE avec possibilité de changer le nom
+    // Paramètres: nouveau_nom, bio, annee, email, tel, ville, website, social, ancien_nom
     private static final String UPDATE =
-            "UPDATE ARTISTE SET bio=?, annee_naissance=?, email_contact=?, " +
-                    "telephone=?, ville=?, website=?, social_media=? WHERE nom=?";
+            "UPDATE ARTISTE SET nom=?, bio=?, annee_naissance=?, email_contact=?, " +
+            "telephone=?, ville=?, website=?, social_media=? WHERE nom=?";
 
     private static final String DELETE = "DELETE FROM ARTISTE WHERE nom=?";
 
@@ -78,20 +80,26 @@ public class JdbcArtistDao implements ArtistDao {
 
     @Override
     public void update(Artist artist) {
+        update(artist, artist.getName());
+    }
+
+    /** Update avec ancien nom comme critère WHERE */
+    public void update(Artist artist, String oldName) {
         try (Connection conn = ConnectionManager.getConnection();
              PreparedStatement ps = conn.prepareStatement(UPDATE)) {
             conn.setAutoCommit(false);
             try {
-                ps.setString(1, artist.getBio());
-                ps.setObject(2, artist.getBirthYear(), Types.INTEGER);
-                ps.setString(3, artist.getContactEmail());
-                ps.setString(4, artist.getPhone());
-                ps.setString(5, artist.getCity());
-                ps.setString(6, artist.getWebsite());
-                ps.setString(7, artist.getSocialMedia());
-                ps.setString(8, artist.getName());
+                ps.setString(1, artist.getName());         // nouveau nom
+                ps.setString(2, artist.getBio());
+                ps.setObject(3, artist.getBirthYear(), Types.INTEGER);
+                ps.setString(4, artist.getContactEmail());
+                ps.setString(5, artist.getPhone());
+                ps.setString(6, artist.getCity());
+                ps.setString(7, artist.getWebsite());
+                ps.setString(8, artist.getSocialMedia());
+                ps.setString(9, oldName);                  // WHERE nom=ancien_nom
                 int rows = ps.executeUpdate();
-                if (rows == 0) throw new RuntimeException("Artiste introuvable : " + artist.getName());
+                if (rows == 0) throw new RuntimeException("Artiste introuvable : " + oldName);
                 conn.commit();
             } catch (SQLException e) { conn.rollback(); throw e; }
         } catch (SQLException e) {

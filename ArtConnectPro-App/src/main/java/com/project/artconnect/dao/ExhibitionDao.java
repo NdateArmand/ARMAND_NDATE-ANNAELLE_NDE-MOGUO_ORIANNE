@@ -10,5 +10,8 @@ public interface ExhibitionDao {
 
     void update(Exhibition exhibition);
 
+    /** Update avec ancien titre comme critère WHERE (permet de changer le titre) */
+    void update(Exhibition exhibition, String oldTitle);
+
     void delete(String title);
 }

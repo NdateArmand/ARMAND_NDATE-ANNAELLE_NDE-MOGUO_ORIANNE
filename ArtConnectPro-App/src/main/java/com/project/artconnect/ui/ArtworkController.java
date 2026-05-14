@@ -2,6 +2,7 @@ package com.project.artconnect.ui;
 
 import com.project.artconnect.model.Artwork;
 import com.project.artconnect.model.Session;
+import com.project.artconnect.persistence.JdbcArtworkDao;
 import com.project.artconnect.service.ArtistService;
 import com.project.artconnect.service.ArtworkService;
 import com.project.artconnect.util.ServiceProvider;
@@ -37,6 +38,8 @@ public class ArtworkController implements RoleAware {
 
     private final ArtworkService artworkService = ServiceProvider.getArtworkService();
     private final ArtistService  artistService  = ServiceProvider.getArtistService();
+    private final JdbcArtworkDao artworkDao     = new JdbcArtworkDao();
+    private String originalTitle = null; // titre de la ligne sélectionnée
 
     @FXML
     public void initialize() {
@@ -94,6 +97,7 @@ public class ArtworkController implements RoleAware {
     }
 
     @FXML private void handleCreate() {
+        originalTitle = null; // garantir un INSERT et non un UPDATE
         try { artworkService.createArtwork(buildFromForm());
             setStatus("Artwork added.", false); clearForm(); refreshTable();
         } catch (Exception e) { setStatus("Error: " + e.getMessage(), true); }
@@ -109,7 +113,11 @@ public class ArtworkController implements RoleAware {
                 setStatus("Vous ne pouvez modifier que vos propres œuvres.", true); return;
             }
         }
-        try { artworkService.updateArtwork(buildFromForm());
+        try {
+            Artwork a = buildFromForm(); // contient le nouveau titre saisi
+            // Passer l'ancien titre au DAO pour le WHERE, le nouveau titre est dans a.getTitle()
+            String oldTitle = originalTitle != null ? originalTitle : a.getTitle();
+            artworkDao.update(a, oldTitle);
             setStatus("Updated.", false); refreshTable();
         } catch (Exception e) { setStatus("Error: " + e.getMessage(), true); }
     }
@@ -166,17 +174,21 @@ public class ArtworkController implements RoleAware {
     }
 
     private void fillForm(Artwork a) {
+        originalTitle = a.getTitle(); // sauvegarder le titre original
         if (formTitle  != null) formTitle .setText(a.getTitle()  != null ? a.getTitle()  : "");
         if (formType   != null) formType  .setText(a.getType()   != null ? a.getType()   : "");
         if (formMedium != null) formMedium.setText(a.getMedium() != null ? a.getMedium() : "");
         if (formPrice  != null) formPrice .setText(String.valueOf(a.getPrice()));
         if (formYear   != null) formYear  .setText(a.getCreationYear() != null ? a.getCreationYear().toString() : "");
         if (formStatus != null && a.getStatus() != null) formStatus.setValue(a.getStatus().name());
-        if (formArtist != null && !Session.getInstance().isArtiste() && a.getArtist() != null)
-            formArtist.setValue(a.getArtist().getName());
+        if (formArtist != null && !Session.getInstance().isArtiste()) {
+            // Toujours mettre à jour formArtist (même si null) pour éviter d'afficher le mauvais artiste
+            formArtist.setValue(a.getArtist() != null ? a.getArtist().getName() : null);
+        }
     }
 
     private void clearForm() {
+        originalTitle = null;
         if (formTitle  != null) formTitle.clear();
         if (formType   != null) formType.clear();
         if (formMedium != null) formMedium.clear();

@@ -38,6 +38,7 @@ public class CommunityController implements RoleAware {
     @FXML private Label           statusLabel;
 
     private final CommunityService communityService = ServiceProvider.getCommunityService();
+    private String originalName = null; // nom original avant modification
 
     @FXML
     public void initialize() {
@@ -107,7 +108,12 @@ public class CommunityController implements RoleAware {
         try {
             CommunityMember m = buildFromForm();
             if (session.isMembre()) m.setName(session.getDisplayName());
-            updateMember(m);
+            if (m.getName() == null || m.getName().isBlank()) {
+                setStatus("Erreur : nom introuvable. Reconnectez-vous.", true); return;
+            }
+            // Passer l'ancien nom pour le WHERE (permet de changer le nom)
+            String oldName = (session.isMembre() || originalName == null) ? m.getName() : originalName;
+            updateMember(m, oldName);
             setStatus("Profile updated.", false);
             if (session.isOrganisateur()) refreshTable();
         } catch (Exception e) { setStatus("Error: " + e.getMessage(), true); }
@@ -146,13 +152,19 @@ public class CommunityController implements RoleAware {
         }
     }
     private void updateMember(CommunityMember m) throws SQLException {
+        updateMember(m, m.getName());
+    }
+
+    private void updateMember(CommunityMember m, String oldName) throws SQLException {
         try (Connection conn = ConnectionManager.getConnection();
              PreparedStatement ps = conn.prepareStatement(
-                "UPDATE MEMBRE_COMMUNAUTE SET email=?,annee_naissance=?,telephone=?,ville=?,type_adhesion=? WHERE nom=?")) {
+                "UPDATE MEMBRE_COMMUNAUTE SET nom=?,email=?,annee_naissance=?,telephone=?,ville=?,type_adhesion=? WHERE nom=?")) {
             conn.setAutoCommit(false);
-            ps.setString(1,m.getEmail()); ps.setObject(2,m.getBirthYear(),Types.INTEGER);
-            ps.setString(3,m.getPhone()); ps.setString(4,m.getCity());
-            ps.setString(5,m.getMembershipType()); ps.setString(6,m.getName());
+            ps.setString(1,m.getName()); // nouveau nom
+            ps.setString(2,m.getEmail()); ps.setObject(3,m.getBirthYear(),Types.INTEGER);
+            ps.setString(4,m.getPhone()); ps.setString(5,m.getCity());
+            ps.setString(6,m.getMembershipType());
+            ps.setString(7,oldName); // WHERE nom=ancien_nom
             ps.executeUpdate(); conn.commit();
         }
     }
@@ -166,9 +178,12 @@ public class CommunityController implements RoleAware {
         memberTable.setItems(FXCollections.observableArrayList(communityService.getAllMembers()));
     }
     private CommunityMember buildFromForm() {
-        if (formName==null||formName.getText().isBlank()) throw new IllegalArgumentException("Name required.");
         CommunityMember m = new CommunityMember();
-        m.setName          (formName.getText().trim());
+        // Le nom peut être vide si champ non-éditable (membre) — sera forcé dans handleUpdate
+        if (formName != null && !formName.getText().isBlank())
+            m.setName(formName.getText().trim());
+        else
+            m.setName(Session.getInstance().getDisplayName());
         m.setEmail         (formEmail!=null?formEmail.getText().trim():"");
         m.setCity          (formCity !=null?formCity .getText().trim():"");
         m.setPhone         (formPhone!=null?formPhone.getText().trim():"");
@@ -177,6 +192,7 @@ public class CommunityController implements RoleAware {
         return m;
     }
     private void fillForm(CommunityMember m) {
+        originalName = m.getName();
         if (formName  !=null) formName .setText(m.getName() !=null?m.getName() :"");
         if (formEmail !=null) formEmail.setText(m.getEmail()!=null?m.getEmail():"");
         if (formCity  !=null) formCity .setText(m.getCity() !=null?m.getCity() :"");
@@ -185,6 +201,7 @@ public class CommunityController implements RoleAware {
         if (formMembership!=null&&m.getMembershipType()!=null) formMembership.setValue(m.getMembershipType());
     }
     private void clearForm() {
+        originalName = null;
         if (formName  !=null) formName.clear();
         if (formEmail !=null) formEmail.clear();
         if (formCity  !=null) formCity.clear();

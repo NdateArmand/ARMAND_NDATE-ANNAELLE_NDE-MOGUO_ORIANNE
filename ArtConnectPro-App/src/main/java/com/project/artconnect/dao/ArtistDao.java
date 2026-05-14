@@ -13,6 +13,9 @@ public interface ArtistDao {
 
     void update(Artist artist);
 
+    /** Update avec ancien nom comme critère WHERE (permet de changer le nom) */
+    void update(Artist artist, String oldName);
+
     void delete(String artistName);
 
     List<Artist> findByCity(String city);

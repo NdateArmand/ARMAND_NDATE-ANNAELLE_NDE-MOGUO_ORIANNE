@@ -58,6 +58,7 @@ public class ExhibitionController implements RoleAware {
 
     private final ExhibitionDao  exhibitionDao  = DaoFactory.getExhibitionDao();
     private final GalleryService galleryService = ServiceProvider.getGalleryService();
+    private String originalTitle = null;
 
     @FXML
     public void initialize() {
@@ -186,12 +187,19 @@ public class ExhibitionController implements RoleAware {
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
     @FXML private void handleCreate() {
+        originalTitle = null; // garantir un INSERT
         try { saveWithGallery(buildFromForm()); setStatus("Exhibition added.", false); clearForm(); refreshTable();
         } catch (Exception e) { setStatus("Error: " + e.getMessage(), true); }
     }
     @FXML private void handleUpdate() {
         if (exhibitionTable.getSelectionModel().getSelectedItem() == null) { setStatus("Select.", true); return; }
-        try { exhibitionDao.update(buildFromForm()); setStatus("Updated.", false); refreshTable();
+        try {
+            Exhibition e = buildFromForm(); // contient le nouveau titre
+            String oldTitle = originalTitle != null ? originalTitle : e.getTitle();
+            exhibitionDao.update(e, oldTitle);
+            // Mettre à jour la galerie liée si sélectionnée
+            updateGalleryLink(e.getTitle());
+            setStatus("Updated.", false); refreshTable();
         } catch (Exception e) { setStatus("Error: " + e.getMessage(), true); }
     }
     @FXML private void handleDelete() {
@@ -260,6 +268,36 @@ public class ExhibitionController implements RoleAware {
         exhibitionTable.setItems(FXCollections.observableArrayList(all));
     }
 
+    /** Met à jour la galerie liée à une exposition existante */
+    private void updateGalleryLink(String titre) throws SQLException {
+        if (formGallery == null || formGallery.getValue() == null) return;
+        try (Connection conn = ConnectionManager.getConnection()) {
+            // Récupérer l'id de l'exposition par son titre (le nouveau titre après update)
+            int idExpo;
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT id_exposition FROM exposition WHERE titre=? LIMIT 1")) {
+                ps.setString(1, titre);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) return;
+                    idExpo = rs.getInt("id_exposition");
+                }
+            }
+            conn.setAutoCommit(false);
+            // Délier l'ancienne galerie de cette exposition
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE galerie SET id_exposition=NULL WHERE id_exposition=?")) {
+                ps.setInt(1, idExpo); ps.executeUpdate();
+            }
+            // Lier la nouvelle galerie sélectionnée
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE galerie SET id_exposition=? WHERE nom=?")) {
+                ps.setInt(1, idExpo); ps.setString(2, formGallery.getValue());
+                ps.executeUpdate();
+            }
+            conn.commit();
+        }
+    }
+
     private void saveWithGallery(Exhibition e) throws SQLException {
         exhibitionDao.save(e);
         if (formGallery != null && formGallery.getValue() != null) {
@@ -293,6 +331,7 @@ public class ExhibitionController implements RoleAware {
         return e;
     }
     private void fillForm(Exhibition e) {
+        originalTitle = e.getTitle();
         if (formTitle      !=null) formTitle      .setText(e.getTitle()      !=null?e.getTitle()      :"");
         if (formTheme      !=null) formTheme      .setText(e.getTheme()      !=null?e.getTheme()      :"");
         if (formDescription!=null) formDescription.setText(e.getDescription()!=null?e.getDescription():"");
@@ -301,6 +340,7 @@ public class ExhibitionController implements RoleAware {
         if (formGallery!=null&&e.getGallery()!=null) formGallery.setValue(e.getGallery().getName());
     }
     private void clearForm() {
+        originalTitle = null;
         if (formTitle      !=null) formTitle.clear();
         if (formTheme      !=null) formTheme.clear();
         if (formDescription!=null) formDescription.clear();

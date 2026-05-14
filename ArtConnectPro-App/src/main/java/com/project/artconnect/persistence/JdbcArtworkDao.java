@@ -10,33 +10,39 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Implémentation JDBC de ArtworkDao — table OEUVRE.
+ * JdbcArtworkDao — utilise la colonne id_artiste dans OEUVRE
+ * (ajoutée via migration_oeuvre_id_artiste.sql).
+ * Toutes les oeuvres sont visibles quelle que soit leur relation artiste.
  */
 public class JdbcArtworkDao implements ArtworkDao {
 
     private static final String FIND_ALL =
-            "SELECT o.titre, o.annee_creation, o.type, o.support, " +
+            "SELECT o.id_oeuvre, o.titre, o.annee_creation, o.type, o.support, " +
             "       o.description, o.prix, o.statut, a.nom AS artiste_nom " +
             "FROM OEUVRE o " +
-            "LEFT JOIN ARTISTE a ON a.id_oeuvre = o.id_oeuvre " +
+            "LEFT JOIN ARTISTE a ON a.id_artiste = o.id_artiste " +
             "ORDER BY o.titre";
 
-    private static final String SAVE =
-            "INSERT INTO OEUVRE (titre, annee_creation, type, support, description, prix, statut) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?)";
+    private static final String FIND_BY_ARTIST =
+            "SELECT o.id_oeuvre, o.titre, o.annee_creation, o.type, o.support, " +
+            "       o.description, o.prix, o.statut, a.nom AS artiste_nom " +
+            "FROM OEUVRE o " +
+            "INNER JOIN ARTISTE a ON a.id_artiste = o.id_artiste " +
+            "WHERE a.nom = ? ORDER BY o.titre";
 
+    private static final String SAVE =
+            "INSERT INTO OEUVRE (titre, annee_creation, type, support, description, prix, statut, id_artiste) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, " +
+            "(SELECT id_artiste FROM ARTISTE WHERE nom=? LIMIT 1))";
+
+    // UPDATE avec possibilité de changer le titre
+    // Paramètres : nouveau_titre, annee, type, support, desc, prix, statut, ancien_titre
     private static final String UPDATE =
-            "UPDATE OEUVRE SET annee_creation=?, type=?, support=?, description=?, prix=?, statut=? " +
+            "UPDATE OEUVRE SET titre=?, annee_creation=?, type=?, support=?, description=?, prix=?, statut=?, " +
+            "id_artiste=(SELECT id_artiste FROM ARTISTE WHERE nom=? LIMIT 1) " +
             "WHERE titre=?";
 
     private static final String DELETE = "DELETE FROM OEUVRE WHERE titre=?";
-
-    private static final String FIND_BY_ARTIST =
-            "SELECT o.titre, o.annee_creation, o.type, o.support, " +
-            "       o.description, o.prix, o.statut, a.nom AS artiste_nom " +
-            "FROM OEUVRE o " +
-            "INNER JOIN ARTISTE a ON a.id_oeuvre = o.id_oeuvre " +
-            "WHERE a.nom=? ORDER BY o.titre";
 
     @Override
     public List<Artwork> findAll() {
@@ -53,6 +59,7 @@ public class JdbcArtworkDao implements ArtworkDao {
 
     @Override
     public void save(Artwork artwork) {
+        String artistName = artwork.getArtist() != null ? artwork.getArtist().getName() : null;
         try (Connection conn = ConnectionManager.getConnection();
              PreparedStatement ps = conn.prepareStatement(SAVE)) {
             conn.setAutoCommit(false);
@@ -64,12 +71,10 @@ public class JdbcArtworkDao implements ArtworkDao {
                 ps.setString(5, artwork.getDescription());
                 ps.setDouble(6, artwork.getPrice());
                 ps.setString(7, artwork.getStatus() != null ? artwork.getStatus().name() : "FOR_SALE");
+                ps.setString(8, artistName); // null si pas d'artiste
                 ps.executeUpdate();
                 conn.commit();
-            } catch (SQLException e) {
-                conn.rollback();
-                throw e;
-            }
+            } catch (SQLException e) { conn.rollback(); throw e; }
         } catch (SQLException e) {
             throw new RuntimeException("Erreur save() oeuvre : " + artwork.getTitle(), e);
         }
@@ -77,24 +82,29 @@ public class JdbcArtworkDao implements ArtworkDao {
 
     @Override
     public void update(Artwork artwork) {
+        update(artwork, artwork.getTitle());
+    }
+
+    /** Update avec ancien titre comme critère WHERE */
+    public void update(Artwork artwork, String oldTitle) {
+        String artistName = artwork.getArtist() != null ? artwork.getArtist().getName() : null;
         try (Connection conn = ConnectionManager.getConnection();
              PreparedStatement ps = conn.prepareStatement(UPDATE)) {
             conn.setAutoCommit(false);
             try {
-                ps.setObject(1, artwork.getCreationYear(), Types.INTEGER);
-                ps.setString(2, artwork.getType());
-                ps.setString(3, artwork.getMedium());
-                ps.setString(4, artwork.getDescription());
-                ps.setDouble(5, artwork.getPrice());
-                ps.setString(6, artwork.getStatus() != null ? artwork.getStatus().name() : "FOR_SALE");
-                ps.setString(7, artwork.getTitle());
+                ps.setString(1, artwork.getTitle());   // nouveau titre
+                ps.setObject(2, artwork.getCreationYear(), Types.INTEGER);
+                ps.setString(3, artwork.getType());
+                ps.setString(4, artwork.getMedium());
+                ps.setString(5, artwork.getDescription());
+                ps.setDouble(6, artwork.getPrice());
+                ps.setString(7, artwork.getStatus() != null ? artwork.getStatus().name() : "FOR_SALE");
+                ps.setString(8, artistName);           // sous-SELECT id_artiste WHERE nom=?
+                ps.setString(9, oldTitle);             // WHERE titre=ancien_titre
                 int rows = ps.executeUpdate();
-                if (rows == 0) throw new RuntimeException("Oeuvre introuvable : " + artwork.getTitle());
+                if (rows == 0) throw new RuntimeException("Oeuvre introuvable : " + oldTitle);
                 conn.commit();
-            } catch (SQLException e) {
-                conn.rollback();
-                throw e;
-            }
+            } catch (SQLException e) { conn.rollback(); throw e; }
         } catch (SQLException e) {
             throw new RuntimeException("Erreur update() oeuvre", e);
         }
@@ -110,10 +120,7 @@ public class JdbcArtworkDao implements ArtworkDao {
                 int rows = ps.executeUpdate();
                 if (rows == 0) throw new RuntimeException("Oeuvre introuvable : " + title);
                 conn.commit();
-            } catch (SQLException e) {
-                conn.rollback();
-                throw e;
-            }
+            } catch (SQLException e) { conn.rollback(); throw e; }
         } catch (SQLException e) {
             throw new RuntimeException("Erreur delete() oeuvre : " + title, e);
         }
@@ -144,11 +151,11 @@ public class JdbcArtworkDao implements ArtworkDao {
         a.setPrice       (rs.getDouble("prix"));
         String statut = rs.getString("statut");
         if (statut != null) {
-            switch (statut.toLowerCase()) {
-                case "vendu"  -> a.setStatus(Artwork.Status.SOLD);
-                case "exposé" -> a.setStatus(Artwork.Status.EXHIBITED);
-                default       -> a.setStatus(Artwork.Status.FOR_SALE);
-            }
+            a.setStatus(switch (statut.toUpperCase()) {
+                case "SOLD",      "VENDU"            -> Artwork.Status.SOLD;
+                case "EXHIBITED", "EXPOSÉ", "EXPOSE" -> Artwork.Status.EXHIBITED;
+                default -> Artwork.Status.FOR_SALE;
+            });
         }
         String artisteNom = rs.getString("artiste_nom");
         if (artisteNom != null) {

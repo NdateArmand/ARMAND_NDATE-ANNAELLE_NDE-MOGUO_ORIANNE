@@ -3,6 +3,7 @@ package com.project.artconnect.ui;
 import com.project.artconnect.model.Artist;
 import com.project.artconnect.model.Discipline;
 import com.project.artconnect.model.Session;
+import com.project.artconnect.persistence.JdbcArtistDao;
 import com.project.artconnect.service.ArtistService;
 import com.project.artconnect.util.ConnectionManager;
 import com.project.artconnect.util.ServiceProvider;
@@ -40,6 +41,8 @@ public class ArtistController implements RoleAware {
     @FXML private Label                statusLabel;
 
     private final ArtistService artistService = ServiceProvider.getArtistService();
+    private final JdbcArtistDao artistDao = new JdbcArtistDao();
+    private String originalName = null; // nom original de la ligne sélectionnée
 
     @FXML
     public void initialize() {
@@ -133,6 +136,7 @@ public class ArtistController implements RoleAware {
 
     @FXML private void handleCreate() {
         if (!Session.getInstance().isOrganisateur()) { setStatus("Accès refusé.", true); return; }
+        originalName = null; // garantir un INSERT
         try {
             Artist a = buildFromForm();
             artistService.createArtist(a);
@@ -150,9 +154,13 @@ public class ArtistController implements RoleAware {
             setStatus("Vous ne pouvez modifier que votre propre profil.", true); return;
         }
         try {
-            Artist a = buildFromForm();
+            Artist a = buildFromForm(); // contient le nouveau nom saisi
+            // Pour l'artiste connecté : forcer son propre nom (ne peut pas changer son nom)
             if (session.isArtiste()) a.setName(session.getDisplayName());
-            artistService.updateArtist(a);
+            // Passer l'ancien nom au DAO pour le WHERE
+            String oldName = (session.isArtiste() || originalName == null)
+                    ? a.getName() : originalName;
+            artistDao.update(a, oldName);
             setStatus("Profile updated.", false); refreshTable();
         } catch (Exception e) { setStatus("Error: " + e.getMessage(), true); }
     }
@@ -197,6 +205,7 @@ public class ArtistController implements RoleAware {
     }
 
     private void fillForm(Artist a) {
+        originalName = a.getName();
         if (formName  != null) formName .setText(a.getName()         != null ? a.getName()         : "");
         if (formCity  != null) formCity .setText(a.getCity()         != null ? a.getCity()         : "");
         if (formEmail != null) formEmail.setText(a.getContactEmail() != null ? a.getContactEmail() : "");
@@ -207,6 +216,7 @@ public class ArtistController implements RoleAware {
     }
 
     private void clearForm() {
+        originalName = null;
         if (formName       != null) formName.clear();
         if (formCity       != null) formCity.clear();
         if (formEmail      != null) formEmail.clear();
