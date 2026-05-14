@@ -52,7 +52,7 @@ CREATE TABLE `artiste` (
 
 LOCK TABLES `artiste` WRITE;
 /*!40000 ALTER TABLE `artiste` DISABLE KEYS */;
-INSERT INTO `artiste` VALUES (1,'Julien Mercier',NULL,1980,'julien.mercier@art.fr','64d004cd7494b9f82625c85dfcf37c298dc6c2c2ac571ae683e529b4fcfc4080','0700000001','Paris',NULL,NULL,1,1),(2,'Amandine Koch',NULL,1975,'amandine.koch@art.fr','1197db1182952817c677e5729674c8a52bd5b7bb1091825b5d045e82445fe70e','0700000002','Strasbourg',NULL,NULL,2,2),(3,'Karim Benali',NULL,1988,'karim.benali@art.fr','f6939facc8151233c52d79198b4f2bb7d4e2c6604ed43dc8bc05d5243c89ad23','0700000003','Marseille',NULL,NULL,3,3),(4,'Lucie Chartier',NULL,1992,'lucie.chartier@art.fr','1639c4ce5ff7c5bfc653d480a47ed87072aba0942a0d14d1d16672ed2429158e','0700000004','Lyon',NULL,NULL,4,5),(5,'Étienne Vasseur',NULL,1970,'etienne.vasseur@art.fr','cbdf640c54035f57f9abe8f7b0b6938ee6f633e9a3e08edc47db5eb5504012fe','0700000005','Paris',NULL,NULL,5,2),(6,'Naomi Tremblay',NULL,1995,'naomi.tremblay@art.fr','06d08dc82ade92dbbf47f496b9e1babed203eaf388c86df965add1765fc687b7','0700000006','Bordeaux',NULL,NULL,6,3),(7,'Hugo Lacroix',NULL,1983,'hugo.lacroix@art.fr','1e544168ba1e818a1606c9802f6102f93bf4f78588ae32164bd702cdd53bd371','0700000007','Paris',NULL,NULL,7,1),(8,'Sara Oliveira',NULL,1990,'sara.oliveira@art.fr','077ebc337fac41477575ed1d0f8b4863412b75caa9aa8aa8c935271519e35953','0700000008','Paris',NULL,NULL,8,4);
+INSERT INTO `artiste` VALUES (1,'Julien Mercier',NULL,1980,'julien.mercier@art.fr','64d004cd7494b9f82625c85dfcf37c298dc6c2c2ac571ae683e529b4fcfc4080','0700000001','Paris',NULL,NULL,13,6),(2,'Amandine Koch',NULL,1975,'amandine.koch@art.fr','1197db1182952817c677e5729674c8a52bd5b7bb1091825b5d045e82445fe70e','0700000002','Strasbourg',NULL,NULL,2,2),(3,'Karim Benali',NULL,1988,'karim.benali@art.fr','f6939facc8151233c52d79198b4f2bb7d4e2c6604ed43dc8bc05d5243c89ad23','0700000003','Marseille',NULL,NULL,3,3),(4,'Lucie Chartier',NULL,1992,'lucie.chartier@art.fr','1639c4ce5ff7c5bfc653d480a47ed87072aba0942a0d14d1d16672ed2429158e','0700000004','Lyon',NULL,NULL,4,5),(5,'Étienne Vasseur',NULL,1970,'etienne.vasseur@art.fr','cbdf640c54035f57f9abe8f7b0b6938ee6f633e9a3e08edc47db5eb5504012fe','0700000005','Paris',NULL,NULL,5,2),(6,'Naomi Tremblay',NULL,1995,'naomi.tremblay@art.fr','06d08dc82ade92dbbf47f496b9e1babed203eaf388c86df965add1765fc687b7','0700000006','Bordeaux',NULL,NULL,6,3),(7,'Hugo Lacroix',NULL,1983,'hugo.lacroix@art.fr','1e544168ba1e818a1606c9802f6102f93bf4f78588ae32164bd702cdd53bd371','0700000007','Paris',NULL,NULL,7,1),(8,'Sara Oliveira',NULL,1990,'sara.oliveira@art.fr','077ebc337fac41477575ed1d0f8b4863412b75caa9aa8aa8c935271519e35953','0700000008','Paris',NULL,NULL,8,4);
 /*!40000 ALTER TABLE `artiste` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -100,8 +100,11 @@ CREATE TABLE `atelier` (
   `description` text,
   `niveau` varchar(50) DEFAULT NULL,
   `lieu` varchar(150) DEFAULT NULL,
-  PRIMARY KEY (`id_atelier`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  `id_artiste` int DEFAULT NULL,
+  PRIMARY KEY (`id_atelier`),
+  KEY `fk_atelier_artiste` (`id_artiste`),
+  CONSTRAINT `fk_atelier_artiste` FOREIGN KEY (`id_artiste`) REFERENCES `artiste` (`id_artiste`) ON DELETE SET NULL
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -110,7 +113,7 @@ CREATE TABLE `atelier` (
 
 LOCK TABLES `atelier` WRITE;
 /*!40000 ALTER TABLE `atelier` DISABLE KEYS */;
-INSERT INTO `atelier` VALUES (1,'Initiation à l\'aquarelle','2024-04-15 10:00:00',180,12,45.00,'Découverte des techniques de base de l\'aquarelle pour débutants.','débutant','Studio Lumière, Paris'),(2,'Sculpture sur argile','2024-05-20 14:00:00',240,8,60.00,'Modelage libre et découverte des formes tridimensionnelles.','intermédiaire','Espace Sculptura, Paris'),(3,'Photographie urbaine','2024-06-10 09:00:00',300,10,55.00,'Sortie photo guidée dans les rues de la ville.','tous niveaux','Centre-ville'),(4,'Improvisation musicale','2024-07-05 18:00:00',120,15,35.00,'Atelier de jam session ouvert à tous niveaux.','tous niveaux','Centre Culturel Bastille'),(5,'Peinture abstraite expressive','2024-08-12 10:00:00',180,10,50.00,'Exploration des émotions à travers la peinture abstraite.','avancé','Galerie du Marais, Paris');
+INSERT INTO `atelier` VALUES (1,'Initiation à l\'aquarelle','2024-04-15 10:00:00',180,12,45.00,'Découverte des techniques de base de l\'aquarelle pour débutants.','intermédiaire','Studio Lumière, Paris',7),(2,'Sculpture sur argile','2024-05-20 14:00:00',240,8,60.00,'Modelage libre et découverte des formes tridimensionnelles.','intermédiaire','Espace Sculptura, Paris',2),(3,'Photographie urbaine','2024-06-10 09:00:00',300,10,55.00,'Sortie photo guidée dans les rues de la ville.','tous niveaux','Centre-ville',3),(4,'Improvisation musicale','2024-07-05 18:00:00',120,15,35.00,'Atelier de jam session ouvert à tous niveaux.','tous niveaux','Centre Culturel Bastille',8),(5,'Peinture abstraite expressive','2024-08-12 10:00:00',180,10,50.00,'Exploration des émotions à travers la peinture abstraite.','avancé','Galerie du Marais, Paris',4),(6,'poterie','2022-07-23 10:00:00',12,12,0.00,NULL,NULL,'lyon',1),(7,'art pinceau','2022-03-24 10:00:00',234,23,2323.00,NULL,NULL,'villejuif',1);
 /*!40000 ALTER TABLE `atelier` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -245,7 +248,7 @@ CREATE TABLE `galerie` (
   PRIMARY KEY (`id_galerie`),
   KEY `id_exposition` (`id_exposition`),
   CONSTRAINT `galerie_ibfk_1` FOREIGN KEY (`id_exposition`) REFERENCES `exposition` (`id_exposition`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -336,9 +339,12 @@ CREATE TABLE `oeuvre` (
   `description` text,
   `prix` decimal(10,2) DEFAULT NULL,
   `statut` varchar(50) DEFAULT NULL,
+  `id_artiste` int DEFAULT NULL,
   PRIMARY KEY (`id_oeuvre`),
-  KEY `idx_oeuvre_statut` (`statut`)
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `idx_oeuvre_statut` (`statut`),
+  KEY `fk_oeuvre_artiste` (`id_artiste`),
+  CONSTRAINT `fk_oeuvre_artiste` FOREIGN KEY (`id_artiste`) REFERENCES `artiste` (`id_artiste`) ON DELETE SET NULL
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -347,7 +353,7 @@ CREATE TABLE `oeuvre` (
 
 LOCK TABLES `oeuvre` WRITE;
 /*!40000 ALTER TABLE `oeuvre` DISABLE KEYS */;
-INSERT INTO `oeuvre` VALUES (1,'Le Pont au Crépuscule',2020,'Peinture','Huile sur toile',NULL,1300.00,'FOR_SALE'),(2,'Fragment #3',2023,'Sculpture','Bronze','Sculpture abstraite fragmentée en bronze patiné.',3500.00,'vendu'),(3,'Ruelle Oubliée',2021,'Photographie','Tirage argentique','Photographie en noir et blanc d\'une ruelle parisienne.',450.00,'exposé'),(4,'Symphonie Bleue',2023,'Peintur','Acrylique sur toile',NULL,800.00,'EXHIBITED'),(5,'Éclats de Mémoire',2020,'Sculpture','Verre soufflé','Installation de fragments de verre colorés suspendus.',2800.00,'exposé'),(6,'Visages de la Ville',2022,'Photographie','Impression numérique','Série de portraits d\'habitants de quartiers populaires.',600.00,'exposé'),(7,'L\'Arbre Rouge',2023,'Peinture','Huile sur toile','Arbre solitaire dans un paysage hivernal.',950.00,'disponible'),(8,'Résonance',2024,'Installation','Métal et sons','Installation sonore et visuelle interactive.',5000.00,'exposé');
+INSERT INTO `oeuvre` VALUES (1,'Le Pont au Crépuscule',2020,'Peinture','Huile sur toile',NULL,1300.00,'SOLD',NULL),(2,'Fragment #3',2023,'Sculpture','Bronze',NULL,3500.00,'EXHIBITED',2),(3,'Ruelle Oubliée',2021,'Photographie','Tirage argentique','Photographie en noir et blanc d\'une ruelle parisienne.',450.00,'exposé',3),(4,'Symphonie Bleue',2023,'Peintur','Acrylique sur toile',NULL,800.00,'SOLD',4),(5,'Éclats de Mémoire',2020,'Sculpture','Verre soufflé','Installation de fragments de verre colorés suspendus.',2800.00,'exposé',5),(6,'Visages de la Ville',2022,'Photographie','Impression numérique',NULL,600.00,'SOLD',6),(7,'L\'Arbre Rouge',2023,'Peinture','Huile sur toile','Arbre solitaire dans un paysage hivernal.',950.00,'disponible',7),(8,'Résonance',2024,'Installation','Métal et sons','Installation sonore et visuelle interactive.',5000.00,'exposé',8),(10,'sss',12,'sss','dee',NULL,13.00,'FOR_SALE',NULL),(11,'ded',23,'dd','dwd',NULL,100.00,'FOR_SALE',NULL),(12,'2df32',43,'fwfe','dd',NULL,23.00,'FOR_SALE',NULL),(13,'tour de verre',2023,'fleche','oile',NULL,23.00,'FOR_SALE',1);
 /*!40000 ALTER TABLE `oeuvre` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -602,4 +608,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-05-13 13:56:05
+-- Dump completed on 2026-05-14 12:45:33
