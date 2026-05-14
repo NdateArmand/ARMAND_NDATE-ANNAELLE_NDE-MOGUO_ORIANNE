@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox spacing="10.0" xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.project.artconnect.ui.GalleryController">
+    <padding><Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/></padding>
+
+    <!-- Tableau des galeries (tous les rôles) -->
+    <TableView fx:id="galleryTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="nameColumn"    text="Name"    prefWidth="180"/>
+            <TableColumn fx:id="addressColumn" text="Address" prefWidth="200"/>
+            <TableColumn fx:id="ownerColumn"   text="Owner"   prefWidth="140"/>
+            <TableColumn fx:id="hoursColumn"   text="Hours"   prefWidth="130"/>
+            <TableColumn fx:id="phoneColumn"   text="Phone"   prefWidth="120"/>
+        </columns>
+    </TableView>
+
+    <!-- Expositions de la galerie sélectionnée (tous les rôles) -->
+    <VBox spacing="4">
+        <Label fx:id="detailLabel"
+               style="-fx-font-size:11px;-fx-text-fill:gray;-fx-font-weight:bold;"/>
+        <ListView fx:id="exhibitionList" prefHeight="100"/>
+    </VBox>
+
+    <Separator/>
+
+    <!-- CRUD — ORGANISATEUR uniquement -->
+    <Label fx:id="crudTitle" text="Add / Edit Gallery" style="-fx-font-weight:bold;"/>
+
+    <GridPane fx:id="crudForm" hgap="10" vgap="6">
+        <Label text="Name:"    GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+        <TextField fx:id="formName"    promptText="Gallery name" prefWidth="200"
+                   GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+        <Label text="Owner:"   GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+        <TextField fx:id="formOwner"   promptText="Owner name"   prefWidth="160"
+                   GridPane.columnIndex="3" GridPane.rowIndex="0"/>
+
+        <Label text="Address:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+        <TextField fx:id="formAddress" promptText="Full address"  prefWidth="200"
+                   GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+        <Label text="Phone:"   GridPane.columnIndex="2" GridPane.rowIndex="1"/>
+        <TextField fx:id="formPhone"   promptText="Phone number"  prefWidth="160"
+                   GridPane.columnIndex="3" GridPane.rowIndex="1"/>
+
+        <Label text="Opening:" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+        <TextField fx:id="formOpening" promptText="e.g. 09:00"   prefWidth="100"
+                   GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+        <Label text="Closing:" GridPane.columnIndex="2" GridPane.rowIndex="2"/>
+        <TextField fx:id="formClosing" promptText="e.g. 19:00"   prefWidth="100"
+                   GridPane.columnIndex="3" GridPane.rowIndex="2"/>
+    </GridPane>
+
+    <HBox fx:id="crudBox" spacing="10.0" alignment="CENTER_LEFT">
+        <Button text="Add"        onAction="#handleCreate"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Button text="Update"     onAction="#handleUpdate"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Button text="Delete"     onAction="#handleDelete"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Button text="Reset Form" onAction="#handleResetForm"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Label fx:id="statusLabel" style="-fx-font-size:12px;"/>
+    </HBox>
+</VBox>

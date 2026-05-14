@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox spacing="10.0" xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.project.artconnect.ui.ExhibitionController">
+    <padding><Insets bottom="10" left="10" right="10" top="10"/></padding>
+
+    <TableView fx:id="exhibitionTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="titleColumn"   text="Title"      prefWidth="200"/>
+            <TableColumn fx:id="galleryColumn" text="Gallery"    prefWidth="160"/>
+            <TableColumn fx:id="dateColumn"    text="Start Date" prefWidth="110"/>
+            <TableColumn fx:id="themeColumn"   text="Theme"      prefWidth="140"/>
+            <!-- ORGANISATEUR uniquement : nombre de réservations -->
+            <TableColumn fx:id="reservesColumn"     text="Réservés"   prefWidth="80"/>
+            <!-- MEMBRE uniquement : statut réservation -->
+            <TableColumn fx:id="statutMembreColumn" text="Mon statut" prefWidth="110"/>
+        </columns>
+    </TableView>
+
+    <!-- ORGANISATEUR : liste des membres ayant réservé au clic -->
+    <VBox fx:id="reservesPanel" spacing="6">
+        <Label fx:id="reservesPanelTitle"
+               style="-fx-font-weight:bold;-fx-font-size:12px;"/>
+        <ListView fx:id="reservesListView" prefHeight="120"/>
+    </VBox>
+
+    <!-- MEMBRE : boutons Réserver / Annuler -->
+    <HBox fx:id="reservationBox" spacing="10" alignment="CENTER_LEFT">
+        <Button text="Réserver cette exposition" onAction="#handleReserver"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Button fx:id="btnAnnulerReservation" text="Annuler ma réservation"
+                onAction="#handleAnnulerReservation"
+                style="-fx-background-color:#b71c1c;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Label fx:id="reservationLabel" style="-fx-font-size:12px;"/>
+    </HBox>
+
+    <Separator/>
+    <Label fx:id="crudTitle" text="Add / Edit Exhibition" style="-fx-font-weight:bold;"/>
+
+    <GridPane fx:id="crudForm" hgap="10" vgap="6">
+        <Label text="Title:"       GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+        <TextField fx:id="formTitle"       promptText="Exhibition title"   prefWidth="200"
+                   GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+        <Label text="Theme:"       GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+        <TextField fx:id="formTheme"       promptText="e.g. Art numérique" prefWidth="160"
+                   GridPane.columnIndex="3" GridPane.rowIndex="0"/>
+
+        <Label text="Gallery:"     GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+        <ComboBox fx:id="formGallery" promptText="Select gallery" prefWidth="200"
+                  GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+
+        <Label text="Start Date:"  GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+        <TextField fx:id="formStartDate"   promptText="YYYY-MM-DD" prefWidth="130"
+                   GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+        <Label text="End Date:"    GridPane.columnIndex="2" GridPane.rowIndex="2"/>
+        <TextField fx:id="formEndDate"     promptText="YYYY-MM-DD" prefWidth="130"
+                   GridPane.columnIndex="3" GridPane.rowIndex="2"/>
+
+        <Label text="Description:" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+        <TextField fx:id="formDescription" promptText="Description" prefWidth="380"
+                   GridPane.columnIndex="1" GridPane.rowIndex="3"
+                   GridPane.columnSpan="3"/>
+    </GridPane>
+
+    <HBox fx:id="crudBox" spacing="10" alignment="CENTER_LEFT">
+        <Button text="Add"        onAction="#handleCreate"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Button text="Update"     onAction="#handleUpdate"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Button text="Delete"     onAction="#handleDelete"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Button text="Reset Form" onAction="#handleResetForm"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Label fx:id="statusLabel" style="-fx-font-size:12px;"/>
+    </HBox>
+</VBox>

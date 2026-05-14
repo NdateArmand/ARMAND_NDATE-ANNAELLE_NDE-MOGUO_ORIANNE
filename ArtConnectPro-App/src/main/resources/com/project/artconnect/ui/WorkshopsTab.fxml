@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox spacing="10.0" xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.project.artconnect.ui.WorkshopController">
+    <padding><Insets bottom="10" left="10" right="10" top="10"/></padding>
+
+    <TableView fx:id="workshopTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="titleColumn"      text="Title"          prefWidth="180"/>
+            <TableColumn fx:id="instructorColumn" text="Instructor"     prefWidth="130"/>
+            <TableColumn fx:id="dateColumn"       text="Date"           prefWidth="130"/>
+            <TableColumn fx:id="priceColumn"      text="Price"          prefWidth="70"/>
+            <TableColumn fx:id="levelColumn"      text="Level"          prefWidth="100"/>
+            <TableColumn fx:id="durationColumn"   text="Duration (min)" prefWidth="100"/>
+            <!-- ORGANISATEUR uniquement : nombre d'inscrits -->
+            <TableColumn fx:id="inscritsColumn"      text="Inscrits"   prefWidth="80"/>
+            <!-- MEMBRE uniquement : statut inscription -->
+            <TableColumn fx:id="statutMembreColumn"  text="Mon statut" prefWidth="110"/>
+        </columns>
+    </TableView>
+
+    <!-- ARTISTE : label inscrits quand il sélectionne un atelier -->
+    <Label fx:id="artistInscritsLabel"
+           style="-fx-font-size:13px;-fx-font-weight:bold;-fx-text-fill:#455A64;"/>
+
+    <!-- ORGANISATEUR : liste des membres inscrits au clic -->
+    <VBox fx:id="inscritsPanel" spacing="6">
+        <Label fx:id="inscritsPanelTitle"
+               style="-fx-font-weight:bold;-fx-font-size:12px;"/>
+        <ListView fx:id="inscritsListView" prefHeight="120"/>
+    </VBox>
+
+    <!-- MEMBRE : bouton S'inscrire / Se désinscrire -->
+    <HBox fx:id="inscriptionBox" spacing="10" alignment="CENTER_LEFT">
+        <Button text="S'inscrire à cet atelier" onAction="#handleInscrire"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Button fx:id="btnDesinscrire" text="Se désinscrire" onAction="#handleDesinscrire"
+                style="-fx-background-color:#b71c1c;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Label fx:id="inscriptionLabel" style="-fx-font-size:12px;"/>
+    </HBox>
+
+    <Separator/>
+    <Label fx:id="crudTitle" text="Add / Edit Workshop" style="-fx-font-weight:bold;"/>
+
+    <GridPane fx:id="crudForm" hgap="10" vgap="6">
+        <Label text="Title:"          GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+        <TextField fx:id="formTitle"    promptText="Title"           prefWidth="180"
+                   GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+        <Label text="Price:"          GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+        <TextField fx:id="formPrice"    promptText="e.g. 45.0"       prefWidth="100"
+                   GridPane.columnIndex="3" GridPane.rowIndex="0"/>
+
+        <Label text="Instructor:"     GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+        <ComboBox fx:id="formInstructor" promptText="Select instructor" prefWidth="180"
+                  GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+        <Label text="Level:"          GridPane.columnIndex="2" GridPane.rowIndex="1"/>
+        <ComboBox fx:id="formLevel"     prefWidth="130"
+                  GridPane.columnIndex="3" GridPane.rowIndex="1"/>
+
+        <Label text="Date:"           GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+        <TextField fx:id="formDate"     promptText="YYYY-MM-DD HH:MM" prefWidth="180"
+                   GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+        <Label text="Duration (min):" GridPane.columnIndex="2" GridPane.rowIndex="2"/>
+        <TextField fx:id="formDuration" promptText="e.g. 180"         prefWidth="100"
+                   GridPane.columnIndex="3" GridPane.rowIndex="2"/>
+
+        <Label text="Max Places:"     GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+        <TextField fx:id="formMaxPart"  promptText="e.g. 10"          prefWidth="80"
+                   GridPane.columnIndex="1" GridPane.rowIndex="3"/>
+        <Label text="Location:"       GridPane.columnIndex="2" GridPane.rowIndex="3"/>
+        <TextField fx:id="formLocation" promptText="Location"         prefWidth="180"
+                   GridPane.columnIndex="3" GridPane.rowIndex="3"/>
+    </GridPane>
+
+    <HBox fx:id="crudBox" spacing="10.0" alignment="CENTER_LEFT">
+        <Button text="Add"        onAction="#handleCreate"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Button text="Update"     onAction="#handleUpdate"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Button text="Delete"     onAction="#handleDelete"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Button text="Reset Form" onAction="#handleResetForm"
+                style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
+        <Label fx:id="statusLabel" style="-fx-font-size:12px;"/>
+    </HBox>
+</VBox>
