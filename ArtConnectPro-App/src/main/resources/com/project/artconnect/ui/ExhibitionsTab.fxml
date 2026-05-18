@@ -3,32 +3,81 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.geometry.Insets?>
 
-<VBox spacing="10.0" xmlns="http://javafx.com/javafx/17"
-      xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="com.project.artconnect.ui.ExhibitionController">
+<ScrollPane fitToWidth="true"
+            xmlns="http://javafx.com/javafx/17"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.project.artconnect.ui.ExhibitionController">
+
+<VBox spacing="10.0">
     <padding><Insets bottom="10" left="10" right="10" top="10"/></padding>
 
-    <TableView fx:id="exhibitionTable" VBox.vgrow="ALWAYS">
+    <!-- ── Tableau des expositions ─────────────────────────────────────── -->
+    <TableView fx:id="exhibitionTable" prefHeight="220" VBox.vgrow="SOMETIMES">
         <columns>
-            <TableColumn fx:id="titleColumn"   text="Title"      prefWidth="200"/>
-            <TableColumn fx:id="galleryColumn" text="Gallery"    prefWidth="160"/>
-            <TableColumn fx:id="dateColumn"    text="Start Date" prefWidth="110"/>
-            <TableColumn fx:id="themeColumn"   text="Theme"      prefWidth="140"/>
-            <!-- ORGANISATEUR uniquement : nombre de réservations -->
+            <TableColumn fx:id="titleColumn"        text="Title"      prefWidth="200"/>
+            <TableColumn fx:id="galleryColumn"      text="Gallery"    prefWidth="160"/>
+            <TableColumn fx:id="dateColumn"         text="Start Date" prefWidth="110"/>
+            <TableColumn fx:id="themeColumn"        text="Theme"      prefWidth="140"/>
             <TableColumn fx:id="reservesColumn"     text="Réservés"   prefWidth="80"/>
-            <!-- MEMBRE uniquement : statut réservation -->
             <TableColumn fx:id="statutMembreColumn" text="Mon statut" prefWidth="110"/>
         </columns>
     </TableView>
 
-    <!-- ORGANISATEUR : liste des membres ayant réservé au clic -->
+    <!-- ── ORGANISATEUR : membres ayant réservé ───────────────────────── -->
     <VBox fx:id="reservesPanel" spacing="6">
         <Label fx:id="reservesPanelTitle"
                style="-fx-font-weight:bold;-fx-font-size:12px;"/>
-        <ListView fx:id="reservesListView" prefHeight="120"/>
+        <ListView fx:id="reservesListView" prefHeight="100"/>
     </VBox>
 
-    <!-- MEMBRE : boutons Réserver / Annuler -->
+    <!-- ── ORGANISATEUR : gestion des œuvres de l'exposition ─────────── -->
+    <VBox fx:id="artworksPanel" spacing="8"
+          style="-fx-padding:10;-fx-border-color:#cccccc;-fx-border-radius:5;-fx-background-color:#f5f5f5;-fx-background-radius:5;">
+
+        <Label fx:id="artworksPanelTitle"
+               text="Sélectionnez une exposition pour gérer ses œuvres"
+               style="-fx-font-weight:bold;-fx-font-size:13px;"/>
+
+        <HBox spacing="10">
+
+            <!-- Liste gauche : œuvres disponibles -->
+            <VBox spacing="4" HBox.hgrow="ALWAYS">
+                <Label text="Œuvres disponibles"
+                       style="-fx-font-style:italic;-fx-text-fill:#555;"/>
+                <ListView fx:id="availableArtworksList" prefHeight="180"/>
+            </VBox>
+
+            <!-- Boutons du milieu -->
+            <VBox spacing="8" alignment="CENTER" minWidth="120">
+                <Label text="Emplacement :"
+                       style="-fx-font-size:11px;-fx-text-fill:#555;"/>
+                <TextField fx:id="emplacementField"
+                           promptText="ex : Salle A"
+                           prefWidth="115"/>
+                <Button text="Ajouter →"
+                        onAction="#handleAddArtworkToExhibition"
+                        prefWidth="115"
+                        style="-fx-background-color:#388E3C;-fx-text-fill:white;-fx-font-weight:bold;-fx-background-radius:4;"/>
+                <Button text="← Retirer"
+                        onAction="#handleRemoveArtworkFromExhibition"
+                        prefWidth="115"
+                        style="-fx-background-color:#c62828;-fx-text-fill:white;-fx-font-weight:bold;-fx-background-radius:4;"/>
+                <Label fx:id="artworksStatusLabel"
+                       wrapText="true" maxWidth="115"
+                       style="-fx-font-size:11px;"/>
+            </VBox>
+
+            <!-- Liste droite : œuvres exposées -->
+            <VBox spacing="4" HBox.hgrow="ALWAYS">
+                <Label text="Œuvres exposées"
+                       style="-fx-font-style:italic;-fx-text-fill:#555;"/>
+                <ListView fx:id="exhibitedArtworksList" prefHeight="180"/>
+            </VBox>
+
+        </HBox>
+    </VBox>
+
+    <!-- ── MEMBRE : boutons réservation ───────────────────────────────── -->
     <HBox fx:id="reservationBox" spacing="10" alignment="CENTER_LEFT">
         <Button text="Réserver cette exposition" onAction="#handleReserver"
                 style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
@@ -39,7 +88,10 @@
     </HBox>
 
     <Separator/>
-    <Label fx:id="crudTitle" text="Add / Edit Exhibition" style="-fx-font-weight:bold;"/>
+
+    <!-- ── CRUD exposition ─────────────────────────────────────────────── -->
+    <Label fx:id="crudTitle" text="Add / Edit Exhibition"
+           style="-fx-font-weight:bold;"/>
 
     <GridPane fx:id="crudForm" hgap="10" vgap="6">
         <Label text="Title:"       GridPane.columnIndex="0" GridPane.rowIndex="0"/>
@@ -77,4 +129,6 @@
                 style="-fx-background-color:#455A64;-fx-text-fill:white;-fx-background-radius:4;"/>
         <Label fx:id="statusLabel" style="-fx-font-size:12px;"/>
     </HBox>
+
 </VBox>
+</ScrollPane>

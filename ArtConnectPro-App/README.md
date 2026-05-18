@@ -47,7 +47,39 @@ UPDATE oeuvre SET statut = 'EXHIBITED' WHERE statut IN ('exposé', 'expose');
 SET SQL_SAFE_UPDATES = 1;
 ```
 
-### 2. Configurer les mots de passe
+### 2. Migration des relations artiste (OBLIGATOIRE)
+
+Ces scripts ajoutent `id_artiste` dans les tables `OEUVRE` et `ATELIER` pour corriger
+l'affichage de toutes les œuvres et ateliers dans l'interface :
+
+```sql
+USE artconnect;
+SET SQL_SAFE_UPDATES = 0;
+
+-- Ajouter id_artiste dans OEUVRE
+ALTER TABLE oeuvre
+    ADD COLUMN id_artiste INT NULL,
+    ADD CONSTRAINT fk_oeuvre_artiste
+        FOREIGN KEY (id_artiste) REFERENCES artiste(id_artiste) ON DELETE SET NULL;
+
+UPDATE oeuvre o
+JOIN artiste a ON a.id_oeuvre = o.id_oeuvre
+SET o.id_artiste = a.id_artiste;
+
+-- Ajouter id_artiste dans ATELIER
+ALTER TABLE atelier
+    ADD COLUMN id_artiste INT NULL,
+    ADD CONSTRAINT fk_atelier_artiste
+        FOREIGN KEY (id_artiste) REFERENCES artiste(id_artiste) ON DELETE SET NULL;
+
+UPDATE atelier at
+JOIN artiste a ON a.id_atelier = at.id_atelier
+SET at.id_artiste = a.id_artiste;
+
+SET SQL_SAFE_UPDATES = 1;
+```
+
+### 3. Configurer les mots de passe
 
 ```sql
 -- Organisateur
@@ -60,7 +92,7 @@ UPDATE artiste SET mot_passe = SHA2(CONCAT('art_', LOWER(REPLACE(nom,' ',''))), 
 UPDATE membre_communaute SET mot_passe = SHA2(CONCAT('mem_', LOWER(REPLACE(nom,' ',''))), 256);
 ```
 
-### 3. Configurer la connexion JDBC
+### 4. Configurer la connexion JDBC
 
 Modifier le fichier :
 ```
@@ -108,24 +140,25 @@ mvn javafx:run
 
 ### Visiteur (non connecté)
 - Consultation de tous les onglets sauf Community
-- Lecture seule sur Artworks et Workshops
+- Lecture seule — aucun formulaire CRUD visible
 
 ### Membre
 - Tout ce que voit le visiteur
-- Onglet Community : modification de son propre profil uniquement
-- Onglet Exhibitions : réservation / annulation, colonne statut personnel
-- Onglet Workshops : inscription / désinscription, colonne statut personnel
+- Onglet Community : modification de son propre profil uniquement (tableau masqué)
+- Onglet Exhibitions : réservation / annulation, colonne statut `✅ Réservé / ⬜ Non réservé`
+- Onglet Workshops : inscription / désinscription, colonne statut `✅ Inscrit / ⬜ Non inscrit`
 
 ### Artiste
-- Onglet Artists : modification de son propre profil uniquement
-- Onglet Artworks : CRUD limité à ses propres œuvres
-- Onglet Workshops : CRUD limité à ses propres ateliers + nombre d'inscrits au clic
+- Onglet Artists : formulaire CRUD pré-sélectionné sur son propre profil
+- Onglet Artworks : CRUD limité à ses propres œuvres (artiste verrouillé)
+- Onglet Workshops : CRUD limité à ses propres ateliers + label inscrits au clic
+- Onglet Community : masqué
 
 ### Organisateur
-- CRUD complet sur tous les onglets
-- Onglet Exhibitions : colonne "Réservés" + liste des membres au clic
-- Onglet Workshops : colonne "Inscrits" + liste des membres au clic
-- Onglet Community : gestion complète de tous les membres
+- CRUD complet sur tous les onglets (Artists, Artworks, Galleries, Exhibitions, Workshops, Community)
+- Onglet Exhibitions : colonne "Réservés" + liste nominative des membres au clic
+- Onglet Workshops : colonne "Inscrits" + liste nominative des membres au clic
+- Onglet Community : gestion complète + modification des noms des membres
 
 ---
 
@@ -137,16 +170,16 @@ src/main/java/com/project/artconnect/
 ├── model/                          ← Entités (Artist, Artwork, Gallery…)
 │   ├── Session.java                ← Singleton de session utilisateur
 │   └── UserRole.java               ← Enum PUBLIC / MEMBRE / ARTISTE / ORGANISATEUR
-├── dao/                            ← Interfaces DAO
+├── dao/                            ← Interfaces DAO (ArtistDao, ArtworkDao…)
 │   └── impl/DaoFactory.java        ← Fabrique des DAO JDBC
 ├── persistence/                    ← Implémentations JDBC (JdbcXxxDao)
 ├── service/                        ← Interfaces Service
-│   ├── AuthService.java            ← Authentification (3 tables)
+│   ├── AuthService.java            ← Authentification (3 tables : artiste, membre, organisateur)
 │   └── impl/JdbcXxxService.java    ← Implémentations JDBC
-├── ui/                             ← Controllers JavaFX + interface RoleAware
-│   ├── RoleAware.java              ← Interface applyRole() appelée après login
-│   ├── MainController.java         ← Gestion navigation + login/logout
-│   ├── LoginController.java        ← Formulaire de connexion
+├── ui/                             ← Controllers JavaFX
+│   ├── RoleAware.java              ← Interface applyRole() — appelée après chaque login/logout
+│   ├── MainController.java         ← Navigation + gestion login/logout
+│   ├── LoginController.java        ← Formulaire de connexion (popup modale)
 │   └── [Xxx]Controller.java        ← Un controller par onglet
 └── util/
     ├── ConnectionManager.java      ← Connexion JDBC
@@ -173,7 +206,7 @@ src/main/java/com/project/artconnect/
 | `exposition_en_cours` | Fonction | Exhibitions | Vérifie si exposition active |
 | `nb_participants_exposition` | Fonction | Exhibitions | Compte les réservations |
 | `places_disponibles_atelier` | Fonction | Workshops | Places restantes |
-| Transactions commit/rollback | — | Tous | Atomicité de toutes les écritures |
+| Transactions commit/rollback | — | Tous | Atomicité de toutes les écritures JDBC |
 
 ---
 
@@ -181,8 +214,8 @@ src/main/java/com/project/artconnect/
 
 ```
 src/main/resources/com/project/artconnect/ui/
-├── MainView.fxml          ← Fenêtre principale + TabPane
-├── LoginView.fxml         ← Popup de connexion
+├── MainView.fxml          ← Fenêtre principale + TabPane + boutons connexion
+├── LoginView.fxml         ← Popup de connexion modale
 ├── DiscoverTab.fxml
 ├── ArtistsTab.fxml
 ├── ArtworksTab.fxml
@@ -198,8 +231,8 @@ src/main/resources/com/project/artconnect/ui/
 
 | Fichier | Contenu |
 |---------|---------|
-| `artconnect.sql` | Création de la base et insertion des données |
-| `artconnect_triggers_procedures.sql` | Triggers, procédures, fonctions et vues |
+| `bd_artconnect.sql` | Création de la base, tables et données initiales |
+| `artconnect_triggers_procedures.sql` | Triggers, procédures stockées, fonctions et vues |
 
 ---
 

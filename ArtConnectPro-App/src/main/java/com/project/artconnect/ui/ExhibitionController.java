@@ -1,10 +1,13 @@
 package com.project.artconnect.ui;
 
 import com.project.artconnect.dao.ExhibitionDao;
+import com.project.artconnect.dao.ExposerDao;
 import com.project.artconnect.dao.impl.DaoFactory;
+import com.project.artconnect.model.Artwork;
 import com.project.artconnect.model.Exhibition;
 import com.project.artconnect.model.Gallery;
 import com.project.artconnect.model.Session;
+import com.project.artconnect.persistence.JdbcExposerDao;
 import com.project.artconnect.service.GalleryService;
 import com.project.artconnect.util.ConnectionManager;
 import com.project.artconnect.util.ServiceProvider;
@@ -26,25 +29,26 @@ import java.util.List;
 
 public class ExhibitionController implements RoleAware {
 
+    // ── Table expositions ─────────────────────────────────────────────────────
     @FXML private TableView<Exhibition>              exhibitionTable;
     @FXML private TableColumn<Exhibition, String>    titleColumn;
     @FXML private TableColumn<Exhibition, String>    galleryColumn;
     @FXML private TableColumn<Exhibition, LocalDate> dateColumn;
     @FXML private TableColumn<Exhibition, String>    themeColumn;
-    @FXML private TableColumn<Exhibition, Number>    reservesColumn;     // ORGANISATEUR
-    @FXML private TableColumn<Exhibition, String>    statutMembreColumn; // MEMBRE
+    @FXML private TableColumn<Exhibition, Number>    reservesColumn;
+    @FXML private TableColumn<Exhibition, String>    statutMembreColumn;
 
-    // ORGANISATEUR : panneau réservations
+    // ── Panneau réservations ORGANISATEUR ────────────────────────────────────
     @FXML private VBox     reservesPanel;
     @FXML private Label    reservesPanelTitle;
     @FXML private ListView<String> reservesListView;
 
-    // MEMBRE
+    // ── MEMBRE ────────────────────────────────────────────────────────────────
     @FXML private HBox   reservationBox;
     @FXML private Button btnAnnulerReservation;
     @FXML private Label  reservationLabel;
 
-    // CRUD
+    // ── CRUD exposition ───────────────────────────────────────────────────────
     @FXML private GridPane        crudForm;
     @FXML private Label           crudTitle;
     @FXML private HBox            crudBox;
@@ -56,9 +60,32 @@ public class ExhibitionController implements RoleAware {
     @FXML private TextField       formDescription;
     @FXML private Label           statusLabel;
 
+    // ── Panneau gestion des œuvres (ORGANISATEUR) ─────────────────────────────
+    /** Conteneur principal du panneau œuvres — à déclarer dans le FXML */
+    @FXML private VBox artworksPanel;
+    /** Label titre du panneau (ex : "Œuvres — Mon Exposition") */
+    @FXML private Label artworksPanelTitle;
+    /** Liste de gauche : œuvres disponibles (non encore dans l'expo) */
+    @FXML private ListView<Artwork> availableArtworksList;
+    /** Liste de droite : œuvres actuellement dans l'expo */
+    @FXML private ListView<Artwork> exhibitedArtworksList;
+    /** Champ optionnel pour saisir l'emplacement avant d'ajouter */
+    @FXML private TextField emplacementField;
+    /** Label de statut propre au panneau œuvres */
+    @FXML private Label artworksStatusLabel;
+
+    // ── DAO & Services ────────────────────────────────────────────────────────
     private final ExhibitionDao  exhibitionDao  = DaoFactory.getExhibitionDao();
     private final GalleryService galleryService = ServiceProvider.getGalleryService();
-    private String originalTitle = null;
+    private final ExposerDao     exposerDao     = new JdbcExposerDao();
+
+    private String originalTitle      = null;
+    /** Titre de l'exposition sélectionnée, utilisé par le panneau œuvres */
+    private String selectedExpoTitle  = null;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Initialisation
+    // ─────────────────────────────────────────────────────────────────────────
 
     @FXML
     public void initialize() {
@@ -67,21 +94,49 @@ public class ExhibitionController implements RoleAware {
         themeColumn  .setCellValueFactory(new PropertyValueFactory<>("theme"));
         galleryColumn.setCellValueFactory(cd -> new SimpleStringProperty(
                 cd.getValue().getGallery() != null ? cd.getValue().getGallery().getName() : "—"));
+
         if (reservesColumn != null)
             reservesColumn.setCellValueFactory(cd ->
                     new SimpleIntegerProperty(getNbReservations(cd.getValue().getTitle())));
+
         if (statutMembreColumn != null)
             statutMembreColumn.setCellValueFactory(cd -> {
                 Session s = Session.getInstance();
                 if (s.isMembre() && s.getIdMembre() != null)
-                    return new SimpleStringProperty(aReserve(cd.getValue().getTitle(), s.getIdMembre()) ? "✅ Réservé" : "⬜ Non réservé");
+                    return new SimpleStringProperty(
+                            aReserve(cd.getValue().getTitle(), s.getIdMembre()) ? "✅ Réservé" : "⬜ Non réservé");
                 return new SimpleStringProperty("");
             });
+
         if (formGallery != null)
             formGallery.setItems(FXCollections.observableArrayList(
                     galleryService.getAllGalleries().stream().map(Gallery::getName).toList()));
+
+        // Rendre chaque item des ListViews d'œuvres lisible
+        configurerCellFactory(availableArtworksList);
+        configurerCellFactory(exhibitedArtworksList);
+
         applyRole();
     }
+
+    /** Affiche "Titre — Artiste (Type)" dans les ListView<Artwork>. */
+    private void configurerCellFactory(ListView<Artwork> lv) {
+        if (lv == null) return;
+        lv.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(Artwork a, boolean empty) {
+                super.updateItem(a, empty);
+                if (empty || a == null) { setText(null); return; }
+                String artiste = a.getArtist() != null ? a.getArtist().getName() : "Artiste inconnu";
+                String type    = a.getType()   != null ? a.getType()             : "";
+                setText(a.getTitle() + "  —  " + artiste + (type.isBlank() ? "" : "  (" + type + ")"));
+            }
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Gestion des rôles
+    // ─────────────────────────────────────────────────────────────────────────
 
     @Override
     public void applyRole() {
@@ -92,9 +147,10 @@ public class ExhibitionController implements RoleAware {
         setVisible(reservesPanel,      false);
         setVisible(reservesColumn,     false);
         setVisible(statutMembreColumn, false);
-        setVisible(crudForm,        false);
-        setVisible(crudBox,         false);
-        setVisible(crudTitle,       false);
+        setVisible(crudForm,           false);
+        setVisible(crudBox,            false);
+        setVisible(crudTitle,          false);
+        setVisible(artworksPanel,      false);   // panneau œuvres masqué par défaut
 
         if (session.isMembre()) {
             setVisible(statutMembreColumn, true);
@@ -106,22 +162,119 @@ public class ExhibitionController implements RoleAware {
             // Lecture seule
 
         } else {
-            // ORGANISATEUR
+            // ── ORGANISATEUR ──────────────────────────────────────────────
             setVisible(crudForm,       true);
             setVisible(crudBox,        true);
             setVisible(crudTitle,      true);
             setVisible(reservesPanel,  true);
             setVisible(reservesColumn, true);
+            setVisible(artworksPanel,  true);    // panneau œuvres visible
+
             exhibitionTable.getSelectionModel().selectedItemProperty()
                     .addListener((obs, old, sel) -> {
-                        if (sel != null) { fillForm(sel); loadReservesPanel(sel.getTitle()); }
+                        if (sel != null) {
+                            fillForm(sel);
+                            loadReservesPanel(sel.getTitle());
+                            loadArtworksPanel(sel.getTitle()); // ← nouveau
+                        }
                     });
         }
 
         refreshTable();
     }
 
-    // ── Boutons MEMBRE selon sélection ────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // Panneau œuvres — ORGANISATEUR
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Charge les deux listes du panneau œuvres pour l'exposition donnée.
+     * Appelé automatiquement à chaque sélection d'une exposition.
+     */
+    private void loadArtworksPanel(String expoTitle) {
+        selectedExpoTitle = expoTitle;
+        if (artworksPanelTitle != null)
+            artworksPanelTitle.setText("Œuvres — " + expoTitle);
+        if (artworksStatusLabel != null)
+            artworksStatusLabel.setText("");
+        refreshArtworksLists();
+    }
+
+    /** Rafraîchit les deux listes sans changer l'exposition sélectionnée. */
+    private void refreshArtworksLists() {
+        if (selectedExpoTitle == null) return;
+        try {
+            List<Artwork> dansExpo    = exposerDao.findArtworksByExhibition(selectedExpoTitle);
+            List<Artwork> horsExpo    = exposerDao.findArtworksNotInExhibition(selectedExpoTitle);
+            if (availableArtworksList != null)
+                availableArtworksList.setItems(FXCollections.observableArrayList(horsExpo));
+            if (exhibitedArtworksList != null)
+                exhibitedArtworksList.setItems(FXCollections.observableArrayList(dansExpo));
+        } catch (Exception e) {
+            setArtworksStatus("Erreur chargement œuvres : " + e.getMessage(), true);
+        }
+    }
+
+    /**
+     * Bouton "→ Ajouter à l'exposition".
+     * Prend l'œuvre sélectionnée dans availableArtworksList et l'insère dans EXPOSER.
+     */
+    @FXML
+    private void handleAddArtworkToExhibition() {
+        if (selectedExpoTitle == null) {
+            setArtworksStatus("Sélectionnez d'abord une exposition.", true); return;
+        }
+        Artwork sel = availableArtworksList != null
+                ? availableArtworksList.getSelectionModel().getSelectedItem() : null;
+        if (sel == null) {
+            setArtworksStatus("Sélectionnez une œuvre dans la liste de gauche.", true); return;
+        }
+        String emplacement = emplacementField != null ? emplacementField.getText().trim() : null;
+        if (emplacement != null && emplacement.isBlank()) emplacement = null;
+        try {
+            exposerDao.addArtworkToExhibition(selectedExpoTitle, sel.getId(), emplacement);
+            setArtworksStatus("\"" + sel.getTitle() + "\" ajoutée à l'exposition.", false);
+            if (emplacementField != null) emplacementField.clear();
+            refreshArtworksLists();
+        } catch (Exception e) {
+            setArtworksStatus("Erreur : " + e.getMessage(), true);
+        }
+    }
+
+    /**
+     * Bouton "← Retirer de l'exposition".
+     * Prend l'œuvre sélectionnée dans exhibitedArtworksList et la supprime de EXPOSER.
+     */
+    @FXML
+    private void handleRemoveArtworkFromExhibition() {
+        if (selectedExpoTitle == null) {
+            setArtworksStatus("Sélectionnez d'abord une exposition.", true); return;
+        }
+        Artwork sel = exhibitedArtworksList != null
+                ? exhibitedArtworksList.getSelectionModel().getSelectedItem() : null;
+        if (sel == null) {
+            setArtworksStatus("Sélectionnez une œuvre dans la liste de droite.", true); return;
+        }
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "Retirer \"" + sel.getTitle() + "\" de l'exposition ?",
+                ButtonType.YES, ButtonType.NO);
+        confirm.showAndWait().ifPresent(bt -> {
+            if (bt == ButtonType.YES) {
+                try {
+                    exposerDao.removeArtworkFromExhibition(selectedExpoTitle, sel.getId());
+                    setArtworksStatus("\"" + sel.getTitle() + "\" retirée de l'exposition.", false);
+                    refreshArtworksLists();
+                } catch (Exception e) {
+                    setArtworksStatus("Erreur : " + e.getMessage(), true);
+                }
+            }
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Réservations MEMBRE
+    // ─────────────────────────────────────────────────────────────────────────
+
     private void updateMembreButtons(Exhibition sel) {
         if (sel == null || !Session.getInstance().isMembre()) return;
         Integer idMembre = Session.getInstance().getIdMembre();
@@ -130,7 +283,6 @@ public class ExhibitionController implements RoleAware {
         if (btnAnnulerReservation != null) setVisible(btnAnnulerReservation, dejaReserve);
     }
 
-    // ── Panneau réservations ORGANISATEUR ────────────────────────────────────
     private void loadReservesPanel(String titre) {
         if (reservesListView == null) return;
         List<String> membres = getMembresReserves(titre);
@@ -139,7 +291,6 @@ public class ExhibitionController implements RoleAware {
             reservesPanelTitle.setText("Membres ayant réservé (" + membres.size() + ") — " + titre);
     }
 
-    // ── MEMBRE : Réserver ─────────────────────────────────────────────────────
     @FXML private void handleReserver() {
         Exhibition sel = exhibitionTable.getSelectionModel().getSelectedItem();
         if (sel == null) { setReservation("Sélectionnez une exposition.", true); return; }
@@ -165,7 +316,6 @@ public class ExhibitionController implements RoleAware {
         } catch (SQLException e) { setReservation("Erreur : " + e.getMessage(), true); }
     }
 
-    // ── MEMBRE : Annuler réservation ─────────────────────────────────────────
     @FXML private void handleAnnulerReservation() {
         Exhibition sel = exhibitionTable.getSelectionModel().getSelectedItem();
         if (sel == null) { setReservation("Sélectionnez une exposition.", true); return; }
@@ -185,37 +335,50 @@ public class ExhibitionController implements RoleAware {
         } catch (SQLException e) { setReservation("Erreur : " + e.getMessage(), true); }
     }
 
-    // ── CRUD ──────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // CRUD exposition
+    // ─────────────────────────────────────────────────────────────────────────
+
     @FXML private void handleCreate() {
-        originalTitle = null; // garantir un INSERT
-        try { saveWithGallery(buildFromForm()); setStatus("Exhibition added.", false); clearForm(); refreshTable();
-        } catch (Exception e) { setStatus("Error: " + e.getMessage(), true); }
+        originalTitle = null;
+        try { saveWithGallery(buildFromForm()); setStatus("Exposition ajoutée.", false); clearForm(); refreshTable();
+        } catch (Exception e) { setStatus("Erreur : " + e.getMessage(), true); }
     }
+
     @FXML private void handleUpdate() {
-        if (exhibitionTable.getSelectionModel().getSelectedItem() == null) { setStatus("Select.", true); return; }
+        if (exhibitionTable.getSelectionModel().getSelectedItem() == null) { setStatus("Sélectionnez une exposition.", true); return; }
         try {
-            Exhibition e = buildFromForm(); // contient le nouveau titre
-            String oldTitle = originalTitle != null ? originalTitle : e.getTitle();
-            exhibitionDao.update(e, oldTitle);
-            // Mettre à jour la galerie liée si sélectionnée
-            updateGalleryLink(e.getTitle());
-            setStatus("Updated.", false); refreshTable();
-        } catch (Exception e) { setStatus("Error: " + e.getMessage(), true); }
+            Exhibition e = buildFromForm();
+            if (originalTitle != null) e.setTitle(originalTitle);
+            exhibitionDao.update(e); setStatus("Mise à jour effectuée.", false); refreshTable();
+        } catch (Exception e) { setStatus("Erreur : " + e.getMessage(), true); }
     }
+
     @FXML private void handleDelete() {
         Exhibition sel = exhibitionTable.getSelectionModel().getSelectedItem();
-        if (sel == null) { setStatus("Select.", true); return; }
-        new Alert(Alert.AlertType.CONFIRMATION, "Delete \"" + sel.getTitle() + "\"?",
+        if (sel == null) { setStatus("Sélectionnez une exposition.", true); return; }
+        new Alert(Alert.AlertType.CONFIRMATION, "Supprimer \"" + sel.getTitle() + "\" ?",
                 ButtonType.YES, ButtonType.NO).showAndWait().ifPresent(bt -> {
             if (bt == ButtonType.YES) {
-                try { exhibitionDao.delete(sel.getTitle()); setStatus("Deleted.", false); clearForm(); refreshTable();
-                } catch (Exception e) { setStatus("Error: " + e.getMessage(), true); }
+                try {
+                    exhibitionDao.delete(sel.getTitle());
+                    setStatus("Exposition supprimée.", false); clearForm(); refreshTable();
+                    // Vider le panneau œuvres
+                    selectedExpoTitle = null;
+                    if (availableArtworksList != null) availableArtworksList.getItems().clear();
+                    if (exhibitedArtworksList != null) exhibitedArtworksList.getItems().clear();
+                    if (artworksPanelTitle   != null) artworksPanelTitle.setText("Sélectionnez une exposition");
+                } catch (Exception e) { setStatus("Erreur : " + e.getMessage(), true); }
             }
         });
     }
+
     @FXML private void handleResetForm() { clearForm(); }
 
-    // ── SQL helpers ───────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // SQL helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
     private int getNbReservations(String titre) {
         String sql = "SELECT COUNT(*) FROM reservation r JOIN exposition e ON e.id_exposition=r.id_exposition WHERE e.titre=?";
         try (Connection conn = ConnectionManager.getConnection();
@@ -262,40 +425,7 @@ public class ExhibitionController implements RoleAware {
     }
 
     private void refreshTable() {
-        Session session = Session.getInstance();
-        List<Exhibition> all = exhibitionDao.findAll();
-        // MEMBRE : voir toutes les expositions (colonne statut indique si réservé)
-        exhibitionTable.setItems(FXCollections.observableArrayList(all));
-    }
-
-    /** Met à jour la galerie liée à une exposition existante */
-    private void updateGalleryLink(String titre) throws SQLException {
-        if (formGallery == null || formGallery.getValue() == null) return;
-        try (Connection conn = ConnectionManager.getConnection()) {
-            // Récupérer l'id de l'exposition par son titre (le nouveau titre après update)
-            int idExpo;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT id_exposition FROM exposition WHERE titre=? LIMIT 1")) {
-                ps.setString(1, titre);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (!rs.next()) return;
-                    idExpo = rs.getInt("id_exposition");
-                }
-            }
-            conn.setAutoCommit(false);
-            // Délier l'ancienne galerie de cette exposition
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE galerie SET id_exposition=NULL WHERE id_exposition=?")) {
-                ps.setInt(1, idExpo); ps.executeUpdate();
-            }
-            // Lier la nouvelle galerie sélectionnée
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE galerie SET id_exposition=? WHERE nom=?")) {
-                ps.setInt(1, idExpo); ps.setString(2, formGallery.getValue());
-                ps.executeUpdate();
-            }
-            conn.commit();
-        }
+        exhibitionTable.setItems(FXCollections.observableArrayList(exhibitionDao.findAll()));
     }
 
     private void saveWithGallery(Exhibition e) throws SQLException {
@@ -318,49 +448,65 @@ public class ExhibitionController implements RoleAware {
             }
         }
     }
+
     private Exhibition buildFromForm() {
-        if (formTitle==null||formTitle.getText().isBlank()) throw new IllegalArgumentException("Title required.");
+        if (formTitle == null || formTitle.getText().isBlank())
+            throw new IllegalArgumentException("Le titre est obligatoire.");
         Exhibition e = new Exhibition();
-        e.setTitle(formTitle.getText().trim());
-        e.setTheme(formTheme!=null?formTheme.getText().trim():"");
-        e.setDescription(formDescription!=null?formDescription.getText().trim():"");
+        e.setTitle      (formTitle.getText().trim());
+        e.setTheme      (formTheme       != null ? formTheme.getText().trim()       : "");
+        e.setDescription(formDescription != null ? formDescription.getText().trim() : "");
         try {
-            if (formStartDate!=null) e.setStartDate(LocalDate.parse(formStartDate.getText().trim()));
-            if (formEndDate  !=null) e.setEndDate  (LocalDate.parse(formEndDate  .getText().trim()));
-        } catch (DateTimeParseException ex) { throw new IllegalArgumentException("Dates : YYYY-MM-DD"); }
+            if (formStartDate != null) e.setStartDate(LocalDate.parse(formStartDate.getText().trim()));
+            if (formEndDate   != null) e.setEndDate  (LocalDate.parse(formEndDate.getText().trim()));
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException("Dates : format YYYY-MM-DD requis.");
+        }
         return e;
     }
+
     private void fillForm(Exhibition e) {
         originalTitle = e.getTitle();
-        if (formTitle      !=null) formTitle      .setText(e.getTitle()      !=null?e.getTitle()      :"");
-        if (formTheme      !=null) formTheme      .setText(e.getTheme()      !=null?e.getTheme()      :"");
-        if (formDescription!=null) formDescription.setText(e.getDescription()!=null?e.getDescription():"");
-        if (formStartDate  !=null) formStartDate  .setText(e.getStartDate()  !=null?e.getStartDate().toString():"");
-        if (formEndDate    !=null) formEndDate    .setText(e.getEndDate()    !=null?e.getEndDate().toString():"");
-        if (formGallery!=null&&e.getGallery()!=null) formGallery.setValue(e.getGallery().getName());
+        if (formTitle       != null) formTitle      .setText(e.getTitle()       != null ? e.getTitle()       : "");
+        if (formTheme       != null) formTheme      .setText(e.getTheme()       != null ? e.getTheme()       : "");
+        if (formDescription != null) formDescription.setText(e.getDescription() != null ? e.getDescription() : "");
+        if (formStartDate   != null) formStartDate  .setText(e.getStartDate()   != null ? e.getStartDate().toString() : "");
+        if (formEndDate     != null) formEndDate    .setText(e.getEndDate()     != null ? e.getEndDate().toString()   : "");
+        if (formGallery != null && e.getGallery() != null) formGallery.setValue(e.getGallery().getName());
     }
+
     private void clearForm() {
         originalTitle = null;
-        if (formTitle      !=null) formTitle.clear();
-        if (formTheme      !=null) formTheme.clear();
-        if (formDescription!=null) formDescription.clear();
-        if (formStartDate  !=null) formStartDate.clear();
-        if (formEndDate    !=null) formEndDate.clear();
-        if (formGallery    !=null) formGallery.setValue(null);
-        if (statusLabel    !=null) statusLabel.setText("");
-        if (reservesListView !=null) reservesListView.getItems().clear();
-        if (reservesPanelTitle!=null) reservesPanelTitle.setText("");
+        if (formTitle       != null) formTitle.clear();
+        if (formTheme       != null) formTheme.clear();
+        if (formDescription != null) formDescription.clear();
+        if (formStartDate   != null) formStartDate.clear();
+        if (formEndDate     != null) formEndDate.clear();
+        if (formGallery     != null) formGallery.setValue(null);
+        if (statusLabel     != null) statusLabel.setText("");
+        if (reservesListView   != null) reservesListView.getItems().clear();
+        if (reservesPanelTitle != null) reservesPanelTitle.setText("");
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers UI
+    // ─────────────────────────────────────────────────────────────────────────
+
     private void setVisible(javafx.scene.Node node, boolean v) {
-        if (node!=null) { node.setVisible(v); node.setManaged(v); }
+        if (node != null) { node.setVisible(v); node.setManaged(v); }
     }
-    private void setVisible(TableColumn<?,?> col, boolean v) { if (col!=null) col.setVisible(v); }
+    private void setVisible(TableColumn<?, ?> col, boolean v) { if (col != null) col.setVisible(v); }
+
     private void setStatus(String msg, boolean err) {
-        if (statusLabel!=null) { statusLabel.setText(msg);
-            statusLabel.setStyle(err?"-fx-text-fill:red;":"-fx-text-fill:green;"); }
+        if (statusLabel != null) { statusLabel.setText(msg);
+            statusLabel.setStyle(err ? "-fx-text-fill:red;" : "-fx-text-fill:green;"); }
     }
     private void setReservation(String msg, boolean err) {
-        if (reservationLabel!=null) { reservationLabel.setText(msg);
-            reservationLabel.setStyle(err?"-fx-text-fill:red;":"-fx-text-fill:green;"); }
+        if (reservationLabel != null) { reservationLabel.setText(msg);
+            reservationLabel.setStyle(err ? "-fx-text-fill:red;" : "-fx-text-fill:green;"); }
+    }
+    private void setArtworksStatus(String msg, boolean err) {
+        if (artworksStatusLabel != null) { artworksStatusLabel.setText(msg);
+            artworksStatusLabel.setStyle(err ? "-fx-text-fill:red;" : "-fx-text-fill:green;"); }
     }
 }

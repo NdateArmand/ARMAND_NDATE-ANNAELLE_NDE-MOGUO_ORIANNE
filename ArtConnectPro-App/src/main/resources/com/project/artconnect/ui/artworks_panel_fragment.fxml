@@ -1,0 +1,79 @@
+<!--
+    ╔══════════════════════════════════════════════════════════════════╗
+    ║  Fragment FXML — Panneau gestion des œuvres d'une exposition     ║
+    ║  À insérer dans exhibition-view.fxml, côté ORGANISATEUR,         ║
+    ║  après le panneau reservesPanel existant.                        ║
+    ╚══════════════════════════════════════════════════════════════════╝
+
+    Prérequis dans le contrôleur (déjà faits dans ExhibitionController) :
+      fx:controller="com.project.artconnect.ui.ExhibitionController"
+
+    Champs @FXML nécessaires :
+      - artworksPanel         (VBox)
+      - artworksPanelTitle    (Label)
+      - availableArtworksList (ListView<Artwork>)
+      - exhibitedArtworksList (ListView<Artwork>)
+      - emplacementField      (TextField)
+      - artworksStatusLabel   (Label)
+
+    Boutons @FXML :
+      - onAction="#handleAddArtworkToExhibition"
+      - onAction="#handleRemoveArtworkFromExhibition"
+-->
+
+<VBox fx:id="artworksPanel"
+      spacing="8"
+      style="-fx-padding:10; -fx-border-color:#cccccc; -fx-border-radius:5; -fx-background-color:#fafafa;">
+
+    <!-- Titre du panneau -->
+    <Label fx:id="artworksPanelTitle"
+           text="Sélectionnez une exposition"
+           style="-fx-font-weight:bold; -fx-font-size:13px;"/>
+
+    <!-- Deux listes côte à côte -->
+    <HBox spacing="10" HBox.hgrow="ALWAYS">
+
+        <!-- Liste GAUCHE : œuvres disponibles (non encore dans l'expo) -->
+        <VBox spacing="4" HBox.hgrow="ALWAYS">
+            <Label text="Œuvres disponibles" style="-fx-font-style:italic;"/>
+            <ListView fx:id="availableArtworksList"
+                      prefHeight="200"
+                      VBox.vgrow="ALWAYS"/>
+        </VBox>
+
+        <!-- Boutons du milieu -->
+        <VBox spacing="6" alignment="CENTER">
+
+            <!-- Champ emplacement (optionnel) -->
+            <Label text="Emplacement :" style="-fx-font-size:11px;"/>
+            <TextField fx:id="emplacementField"
+                       promptText="ex : Salle A"
+                       prefWidth="110"/>
+
+            <!-- Ajouter → -->
+            <Button text="Ajouter →"
+                    onAction="#handleAddArtworkToExhibition"
+                    style="-fx-background-color:#4CAF50; -fx-text-fill:white; -fx-font-weight:bold;"
+                    prefWidth="110"/>
+
+            <!-- ← Retirer -->
+            <Button text="← Retirer"
+                    onAction="#handleRemoveArtworkFromExhibition"
+                    style="-fx-background-color:#f44336; -fx-text-fill:white; -fx-font-weight:bold;"
+                    prefWidth="110"/>
+        </VBox>
+
+        <!-- Liste DROITE : œuvres dans l'expo -->
+        <VBox spacing="4" HBox.hgrow="ALWAYS">
+            <Label text="Œuvres exposées" style="-fx-font-style:italic;"/>
+            <ListView fx:id="exhibitedArtworksList"
+                      prefHeight="200"
+                      VBox.vgrow="ALWAYS"/>
+        </VBox>
+
+    </HBox>
+
+    <!-- Message de statut -->
+    <Label fx:id="artworksStatusLabel" text=""/>
+
+</VBox>
